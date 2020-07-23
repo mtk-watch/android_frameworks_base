@@ -21,12 +21,22 @@ import android.location.IGnssStatusListener;
 import android.os.Handler;
 import android.util.Log;
 
+/// M: [Performance] Improve NMEA callback performance
+import android.os.IBinder;
+import java.util.ArrayList;
+/// M: mtk add end
+
 /**
  * Implementation of a handler for {@link IGnssStatusListener}.
  */
 public abstract class GnssStatusListenerHelper extends RemoteListenerHelper<IGnssStatusListener> {
     private static final String TAG = "GnssStatusListenerHelper";
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
+    /// M: [Performance] Check permissions once for every period time
+    private static final int PERMISSION_CHECK_PERIOD = (1 * 1000 * 1000 * 1000); // 1 sec
+    private long mLastCheckTime = 0;
+    private final ArrayList<IBinder> mPermissionAllowedList = new ArrayList<>();
+    /// M: mtk add end
 
     protected GnssStatusListenerHelper(Context context, Handler handler) {
         super(context, handler, TAG);
@@ -85,10 +95,29 @@ public abstract class GnssStatusListenerHelper extends RemoteListenerHelper<IGns
 
     public void onNmeaReceived(final long timestamp, final String nmea) {
         foreach((IGnssStatusListener listener, CallerIdentity callerIdentity) -> {
-            if (!hasPermission(mContext, callerIdentity)) {
-                logPermissionDisabledEventNotReported(TAG, callerIdentity.mPackageName, "NMEA");
-                return;
+            /// M: [Performance] Improve NMEA callback performance
+            long systemNanoTime = System.nanoTime();
+            if (systemNanoTime - mLastCheckTime >= PERMISSION_CHECK_PERIOD) {
+                Log.d(TAG, "onNmeaReceived re-check permissions of listeners size = "
+                        + mPermissionAllowedList.size()
+                        + " mLastCheckTime = " + mLastCheckTime);
+                mPermissionAllowedList.clear();
+                mLastCheckTime = systemNanoTime;
             }
+            IBinder binder = listener.asBinder();
+            boolean permissionAllowedListContains = mPermissionAllowedList.contains(binder);
+            if (DEBUG) Log.d(TAG, "onNmeaReceived binder=" + binder
+                        + " permissionAllowedListContains=" + permissionAllowedListContains);
+
+            if (!permissionAllowedListContains) {
+                if (!hasPermission(mContext, callerIdentity)) {
+                    logPermissionDisabledEventNotReported(TAG, callerIdentity.mPackageName, "NMEA");
+                    return;
+                } else {
+                    mPermissionAllowedList.add(binder);
+                }
+            }
+            /// M: mtk add end
             listener.onNmeaReceived(timestamp, nmea);
         });
     }

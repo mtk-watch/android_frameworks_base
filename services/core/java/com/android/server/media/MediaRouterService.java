@@ -45,6 +45,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.os.UserHandle;
+import android.os.Build;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.IntArray;
@@ -74,7 +75,8 @@ import java.util.Objects;
 public final class MediaRouterService extends IMediaRouterService.Stub
         implements Watchdog.Monitor {
     private static final String TAG = "MediaRouterService";
-    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
+    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG)
+                                         || !"user".equals(Build.TYPE);
 
     /**
      * Timeout in milliseconds for a selected route to transition from a

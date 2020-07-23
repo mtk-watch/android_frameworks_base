@@ -20,6 +20,7 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.SystemApi;
 import android.annotation.UnsupportedAppUsage;
+import android.annotation.ProductApi;
 import android.content.pm.PackageManager;
 import android.net.IpConfiguration;
 import android.net.IpConfiguration.ProxySettings;
@@ -161,11 +162,25 @@ public class WifiConfiguration implements Parcelable {
          */
         public static final int WPA_EAP_SHA256 = 12;
 
+        ///M: [WAPI] @{
+        /**
+         * WAPI with pre-shared key.
+         * @hide
+         */
+        public static final int WAPI_PSK = 13;
+        /**
+         * WAPI with certificate authentication.
+         * @hide
+         */
+        public static final int WAPI_CERT = 14;
+        /// }@
+
         public static final String varName = "key_mgmt";
 
         public static final String[] strings = { "NONE", "WPA_PSK", "WPA_EAP",
                 "IEEE8021X", "WPA2_PSK", "OSEN", "FT_PSK", "FT_EAP",
-                "SAE", "OWE", "SUITE_B_192", "WPA_PSK_SHA256", "WPA_EAP_SHA256" };
+                "SAE", "OWE", "SUITE_B_192", "WPA_PSK_SHA256", "WPA_EAP_SHA256",
+                "WAPI_PSK", "WAPI_CERT"};
     }
 
     /**
@@ -185,10 +200,16 @@ public class WifiConfiguration implements Parcelable {
          * @hide
          */
         public static final int OSEN = 2;
+        /**
+         * For WAPI.
+         * @hide
+         * @internal
+         */
+        public static final int WAPI = 3;
 
         public static final String varName = "proto";
 
-        public static final String[] strings = { "WPA", "RSN", "OSEN" };
+        public static final String[] strings = { "WPA", "RSN", "OSEN", "WAPI" };
     }
 
     /**
@@ -359,6 +380,8 @@ public class WifiConfiguration implements Parcelable {
     public static final int SECURITY_TYPE_EAP_SUITE_B = 5;
     /** @hide */
     public static final int SECURITY_TYPE_OWE = 6;
+    /** @hide */
+    public static final int SECURITY_TYPE_WAPI = 7;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -369,7 +392,8 @@ public class WifiConfiguration implements Parcelable {
             SECURITY_TYPE_EAP,
             SECURITY_TYPE_SAE,
             SECURITY_TYPE_EAP_SUITE_B,
-            SECURITY_TYPE_OWE
+            SECURITY_TYPE_OWE,
+            SECURITY_TYPE_WAPI
     })
     public @interface SecurityType {}
 
@@ -1756,6 +1780,33 @@ public class WifiConfiguration implements Parcelable {
      */
     public HashMap<String, Integer>  linkedConfigurations;
 
+    ///M: [WAPI] @{
+    /**
+     * Selection mode for WAPI-CERT
+     * 0:Auto select, 1:User select
+     * @hide
+     */
+    @ProductApi
+    public int wapiCertSelMode;
+    /**
+     * Alias for auto choose wapi certificate
+     * @hide
+     */
+    @ProductApi
+    public String wapiCertSel;
+    /**
+     * Type of preshared key for WAPI-PSK
+     * 0:ASCII, 1:HEX
+     * @hide
+     */
+    public int wapiPskType;
+    /**
+     * Preshared key for WAPI-PSK
+     * @hide
+     */
+    public String wapiPsk;
+    /// }@
+
     public WifiConfiguration() {
         networkId = INVALID_NETWORK_ID;
         SSID = null;
@@ -2167,6 +2218,11 @@ public class WifiConfiguration implements Parcelable {
             return KeyMgmt.OWE;
         } else if (allowedKeyManagement.get(KeyMgmt.SUITE_B_192)) {
             return KeyMgmt.SUITE_B_192;
+        ///M: [WAPI]
+        } else if (allowedKeyManagement.get(KeyMgmt.WAPI_PSK)) {
+            return KeyMgmt.WAPI_PSK;
+        } else if (allowedKeyManagement.get(KeyMgmt.WAPI_CERT)) {
+            return KeyMgmt.WAPI_CERT;
         }
         return KeyMgmt.NONE;
     }
@@ -2218,6 +2274,11 @@ public class WifiConfiguration implements Parcelable {
             key = SSID + KeyMgmt.strings[KeyMgmt.SAE];
         } else if (allowedKeyManagement.get(KeyMgmt.SUITE_B_192)) {
             key = SSID + KeyMgmt.strings[KeyMgmt.SUITE_B_192];
+        ///M: [WAPI]
+        } else if (allowedKeyManagement.get(KeyMgmt.WAPI_PSK)) {
+            key = SSID + KeyMgmt.strings[KeyMgmt.WAPI_PSK];
+        } else if (allowedKeyManagement.get(KeyMgmt.WAPI_CERT)) {
+            key = SSID + KeyMgmt.strings[KeyMgmt.WAPI_CERT];
         } else {
             key = SSID + KeyMgmt.strings[KeyMgmt.NONE];
         }
@@ -2431,6 +2492,12 @@ public class WifiConfiguration implements Parcelable {
             macRandomizationSetting = source.macRandomizationSetting;
             requirePMF = source.requirePMF;
             updateIdentifier = source.updateIdentifier;
+            ///M: [WAPI] @{
+            wapiCertSelMode = source.wapiCertSelMode;
+            wapiCertSel = source.wapiCertSel;
+            wapiPskType = source.wapiPskType;
+            wapiPsk = source.wapiPsk;
+            /// }@
         }
     }
 
@@ -2502,6 +2569,12 @@ public class WifiConfiguration implements Parcelable {
         dest.writeParcelable(mRandomizedMacAddress, flags);
         dest.writeInt(macRandomizationSetting);
         dest.writeInt(osu ? 1 : 0);
+        ///M: [WAPI] @{
+        dest.writeInt(wapiCertSelMode);
+        dest.writeString(wapiCertSel);
+        dest.writeInt(wapiPskType);
+        dest.writeString(wapiPsk);
+        /// }@
     }
 
     /** Implement the Parcelable interface {@hide} */
@@ -2575,6 +2648,12 @@ public class WifiConfiguration implements Parcelable {
                 config.mRandomizedMacAddress = in.readParcelable(null);
                 config.macRandomizationSetting = in.readInt();
                 config.osu = in.readInt() != 0;
+                ///M: [WAPI] @{
+                config.wapiCertSelMode = in.readInt();
+                config.wapiCertSel = in.readString();
+                config.wapiPskType = in.readInt();
+                config.wapiPsk = in.readString();
+                /// }@
                 return config;
             }
 

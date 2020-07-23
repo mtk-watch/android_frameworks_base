@@ -23,6 +23,9 @@ import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.concurrent.Semaphore;
+import java.lang.Thread;
+
 
 /**
  * BitmapRegionDecoder can be used to decode a rectangle region from an image.
@@ -40,6 +43,8 @@ public final class BitmapRegionDecoder {
     // ensures that the native decoder object exists and that only one decode can
     // occur at a time.
     private final Object mNativeLock = new Object();
+
+    private Semaphore mDecodeRegionSem = new Semaphore(4);
 
     /**
      * Create a BitmapRegionDecoder from the specified byte array.
@@ -189,15 +194,24 @@ public final class BitmapRegionDecoder {
      */
     public Bitmap decodeRegion(Rect rect, BitmapFactory.Options options) {
         BitmapFactory.Options.validate(options);
-        synchronized (mNativeLock) {
+        /*synchronized (mNativeLock) remove for multi-thread support */ {
             checkRecycled("decodeRegion called on recycled region decoder");
             if (rect.right <= 0 || rect.bottom <= 0 || rect.left >= getWidth()
                     || rect.top >= getHeight())
                 throw new IllegalArgumentException("rectangle is outside the image");
-            return nativeDecodeRegion(mNativeBitmapRegionDecoder, rect.left, rect.top,
+            Bitmap bitmap = null;
+            try {
+                mDecodeRegionSem.acquire();
+                bitmap = nativeDecodeRegion(mNativeBitmapRegionDecoder, rect.left, rect.top,
                     rect.right - rect.left, rect.bottom - rect.top, options,
                     BitmapFactory.Options.nativeInBitmap(options),
                     BitmapFactory.Options.nativeColorSpace(options));
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            } finally {
+                mDecodeRegionSem.release();
+            }
+            return bitmap;
         }
     }
 
@@ -229,6 +243,15 @@ public final class BitmapRegionDecoder {
      */
     public void recycle() {
         synchronized (mNativeLock) {
+            int mSleepCount = 0;
+            while (mDecodeRegionSem.availablePermits() < 4 && mSleepCount < 450) {
+                try {
+                    Thread.sleep(10);
+                    mSleepCount++;
+                } catch (Exception e){
+                    break;
+                }
+            }
             if (!mRecycled) {
                 nativeClean(mNativeBitmapRegionDecoder);
                 mRecycled = true;

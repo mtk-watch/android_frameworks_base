@@ -63,6 +63,8 @@ public final class AssetManager implements AutoCloseable {
     private static final boolean FEATURE_FLAG_IDMAP2 = true;
 
     private static final String FRAMEWORK_APK_PATH = "/system/framework/framework-res.apk";
+    ///M: for load mediatek-res
+    private static final String MEDIATEK_APK_PATH = "/system/framework/mediatek-res.apk";
 
     private static final Object sSync = new Object();
 
@@ -217,6 +219,8 @@ public final class AssetManager implements AutoCloseable {
                 nativeVerifySystemIdmaps();
                 loadStaticRuntimeOverlays(apkAssets);
             }
+            ///M: for load mediatek-res
+            apkAssets.add(ApkAssets.loadFromPath(MEDIATEK_APK_PATH, true /*system*/));
 
             sSystemApkAssetsSet = new ArraySet<>(apkAssets);
             sSystemApkAssets = apkAssets.toArray(new ApkAssets[apkAssets.size()]);
@@ -1157,8 +1161,11 @@ public final class AssetManager implements AutoCloseable {
             }
         }
 
-        if (mObject != 0) {
-            nativeDestroy(mObject);
+        synchronized (this) {
+            if (mObject != 0) {
+                nativeDestroy(mObject);
+                mObject = 0;
+            }
         }
     }
 

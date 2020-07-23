@@ -1323,6 +1323,9 @@ public class Tethering extends BaseNetworkObserver {
                 if (who.lastError() != TETHER_ERROR_NO_ERROR) {
                     getWifiManager().updateInterfaceIpState(
                             who.interfaceName(), IFACE_IP_MODE_CONFIGURATION_ERROR);
+                } else {
+                    getWifiManager().updateInterfaceIpState(
+                            who.interfaceName(), IFACE_IP_MODE_UNSPECIFIED);
                 }
             }
         }

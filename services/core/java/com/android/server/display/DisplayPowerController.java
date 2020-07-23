@@ -36,12 +36,14 @@ import android.hardware.display.DisplayManagerInternal.DisplayPowerCallbacks;
 import android.hardware.display.DisplayManagerInternal.DisplayPowerRequest;
 import android.metrics.LogMaker;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.provider.Settings;
@@ -92,7 +94,8 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     private static final String SCREEN_ON_BLOCKED_TRACE_NAME = "Screen on blocked";
     private static final String SCREEN_OFF_BLOCKED_TRACE_NAME = "Screen off blocked";
 
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = SystemProperties.getBoolean("dbg.dms.dpc", false);
+    private static final boolean MTK_DEBUG = "eng".equals(Build.TYPE);
     private static final boolean DEBUG_PRETEND_PROXIMITY_SENSOR_ABSENT = false;
 
     // If true, uses the color fade on animation.
@@ -105,7 +108,8 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     private static final int SCREEN_DIM_MINIMUM_REDUCTION = 10;
 
     private static final int COLOR_FADE_ON_ANIMATION_DURATION_MILLIS = 250;
-    private static final int COLOR_FADE_OFF_ANIMATION_DURATION_MILLIS = 400;
+    /// M: modify color off fade duration (google default: 400)
+    private static final int COLOR_FADE_OFF_ANIMATION_DURATION_MILLIS = 100;
 
     private static final int MSG_UPDATE_POWER_STATE = 1;
     private static final int MSG_PROXIMITY_SENSOR_DEBOUNCED = 2;
@@ -639,6 +643,14 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                 mPendingRequestChangedLocked = true;
                 sendUpdatePowerStateLocked();
             }
+
+            /// M: Add log @{
+            if (MTK_DEBUG && changed || DEBUG) {
+                Slog.d(TAG, "requestPowerState: " + request +
+                    ", waitForNegativeProximity=" + waitForNegativeProximity +
+                    ", changed=" + changed);
+            }
+            /// @}
 
             return mDisplayReadyLocked;
         }

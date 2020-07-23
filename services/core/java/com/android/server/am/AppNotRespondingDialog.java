@@ -35,7 +35,7 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
-final class AppNotRespondingDialog extends BaseErrorDialog implements View.OnClickListener {
+public final class AppNotRespondingDialog extends BaseErrorDialog implements View.OnClickListener {
     private static final String TAG = "AppNotRespondingDialog";
 
     // Event 'what' codes
@@ -180,12 +180,12 @@ final class AppNotRespondingDialog extends BaseErrorDialog implements View.OnCli
         }
     };
 
-    static class Data {
+    public static class Data {
         final ProcessRecord proc;
         final ApplicationInfo aInfo;
         final boolean aboveSystem;
 
-        Data(ProcessRecord proc, ApplicationInfo aInfo, boolean aboveSystem) {
+        public Data(ProcessRecord proc, ApplicationInfo aInfo, boolean aboveSystem) {
             this.proc = proc;
             this.aInfo = aInfo;
             this.aboveSystem = aboveSystem;

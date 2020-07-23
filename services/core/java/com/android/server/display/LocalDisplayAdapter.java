@@ -55,7 +55,8 @@ import java.util.List;
  */
 final class LocalDisplayAdapter extends DisplayAdapter {
     private static final String TAG = "LocalDisplayAdapter";
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = SystemProperties.getBoolean("dbg.dms.lda", false);
+    private static final boolean MTK_DEBUG = "eng".equals(Build.TYPE);
 
     private static final String UNIQUE_ID_PREFIX = "local:";
 
@@ -551,7 +552,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                     }
 
                     private void setDisplayState(int state) {
-                        if (DEBUG) {
+                        if (DEBUG || MTK_DEBUG) {
                             Slog.d(TAG, "setDisplayState("
                                     + "id=" + physicalDisplayId
                                     + ", state=" + Display.stateToString(state) + ")");
@@ -594,7 +595,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                     }
 
                     private void setDisplayBrightness(int brightness) {
-                        if (DEBUG) {
+                        if (DEBUG || MTK_DEBUG) {
                             Slog.d(TAG, "setDisplayBrightness("
                                     + "id=" + physicalDisplayId
                                     + ", brightness=" + brightness + ")");

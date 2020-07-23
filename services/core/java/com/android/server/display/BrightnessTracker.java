@@ -48,6 +48,7 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
@@ -93,7 +94,7 @@ import java.util.concurrent.TimeUnit;
 public class BrightnessTracker {
 
     static final String TAG = "BrightnessTracker";
-    static final boolean DEBUG = false;
+    static final boolean DEBUG = SystemProperties.getBoolean("dbg.dms.brighttrack", false);
 
     private static final String EVENTS_FILE = "brightness_events.xml";
     private static final String AMBIENT_BRIGHTNESS_STATS_FILE = "ambient_brightness_stats.xml";

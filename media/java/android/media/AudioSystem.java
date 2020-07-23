@@ -1114,19 +1114,22 @@ public class AudioSystem
         return DEFAULT_STREAM_VOLUME[streamType];
     }
 
+
+    /// M: modify the default stream volume @{
     public static int[] DEFAULT_STREAM_VOLUME = new int[] {
-        4,  // STREAM_VOICE_CALL
-        7,  // STREAM_SYSTEM
-        5,  // STREAM_RING
-        5, // STREAM_MUSIC
-        6,  // STREAM_ALARM
-        5,  // STREAM_NOTIFICATION
-        7,  // STREAM_BLUETOOTH_SCO
-        7,  // STREAM_SYSTEM_ENFORCED
-        5, // STREAM_DTMF
-        5, // STREAM_TTS
-        5, // STREAM_ACCESSIBILITY
+        4,   // STREAM_VOICE_CALL
+        15,  // STREAM_SYSTEM
+        8,   // STREAM_RING
+        8,   // STREAM_MUSIC
+        8,   // STREAM_ALARM
+        8,   // STREAM_NOTIFICATION
+        7,   // STREAM_BLUETOOTH_SCO
+        15,  // STREAM_SYSTEM_ENFORCED
+        11,  // STREAM_DTMF
+        11,  // STREAM_TTS
+        11  // STREAM_ACCESSIBILITY
     };
+    /// @}
 
     public static String streamToString(int stream) {
         if (stream >= 0 && stream < STREAM_NAMES.length) return STREAM_NAMES[stream];

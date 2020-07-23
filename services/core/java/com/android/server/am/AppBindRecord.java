@@ -24,7 +24,7 @@ import java.io.PrintWriter;
 /**
  * An association between a service and one of its client applications.
  */
-final class AppBindRecord {
+public final class AppBindRecord {
     final ServiceRecord service;    // The running service.
     final IntentBindRecord intent;  // The intent we are bound to.
     final ProcessRecord client;     // Who has started/bound the service.

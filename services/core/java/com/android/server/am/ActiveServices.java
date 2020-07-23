@@ -829,6 +829,15 @@ public final class ActiveServices {
         }
     }
 
+    void killMisbehavingService(ServiceRecord r,
+            int appUid, int appPid, String localPackageName) {
+        synchronized (mAm) {
+            stopServiceLocked(r);
+            mAm.crashApplication(appUid, appPid, localPackageName, -1,
+                    "Bad notification for startForeground", true /*force*/);
+        }
+    }
+
     IBinder peekServiceLocked(Intent service, String resolvedType, String callingPackage) {
         ServiceLookupResult r = retrieveServiceLocked(service, null, resolvedType, callingPackage,
                 Binder.getCallingPid(), Binder.getCallingUid(),
@@ -2593,16 +2602,37 @@ public final class ActiveServices {
         // Not running -- get it started, and enqueue this service record
         // to be executed when the app comes up.
         if (app == null && !permissionsReviewRequired) {
-            if ((app=mAm.startProcessLocked(procName, r.appInfo, true, intentFlags,
-                    hostingRecord, false, isolated, false)) == null) {
-                String msg = "Unable to launch app "
-                        + r.appInfo.packageName + "/"
-                        + r.appInfo.uid + " for service "
-                        + r.intent.getIntent() + ": process is bad";
-                Slog.w(TAG, msg);
-                bringDownServiceLocked(r);
-                return msg;
+            /// M: DuraSpeed @{
+            String suppressAction = "allowed";
+            if ("1".equals(SystemProperties.get("persist.vendor.duraspeed.support"))) {
+                suppressAction = mAm.mAmsExt.onReadyToStartComponent(r.appInfo.packageName,
+                        r.appInfo.uid, "service", null);
             }
+
+            /// M: For ago performance
+            if ((suppressAction != null) && suppressAction.equals("skipped")
+                    || !mAm.mAmsExt.isComponentNeedsStart(r.appInfo.packageName, "service")) {
+                Slog.d(TAG, "bringUpServiceLocked, suppress to start service!");
+                try {
+                    AppGlobals.getPackageManager().setPackageStoppedState(
+                            r.packageName, true, r.userId);
+                } catch (Exception e) {
+                    Slog.w(TAG, "Exception: " + e);
+                }
+            } else {
+                if ((app=mAm.startProcessLocked(procName, r.appInfo, true, intentFlags,
+                        hostingRecord, false, isolated, false)) == null) {
+                    String msg = "Unable to launch app "
+                            + r.appInfo.packageName + "/"
+                            + r.appInfo.uid + " for service "
+                            + r.intent.getIntent() + ": process is bad";
+                    Slog.w(TAG, msg);
+                    bringDownServiceLocked(r);
+                    return msg;
+                }
+            }
+            /// @}
+
             if (isolated) {
                 r.isolatedProc = app;
             }
@@ -3277,6 +3307,8 @@ public final class ActiveServices {
                     if (DEBUG_SERVICE || DEBUG_SERVICE_EXECUTING) Slog.v(TAG_SERVICE_EXECUTING,
                             "No more executingServices of " + r.shortInstanceName);
                     mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_TIMEOUT_MSG, r.app);
+                    /// M: ANR Debug Mechanism
+                    mAm.mAnrManager.removeServiceMonitorMessage();
                 } else if (r.executeFg) {
                     // Need to re-evaluate whether the app still needs to be in the foreground.
                     for (int i=r.app.executingServices.size()-1; i>=0; i--) {
@@ -3918,7 +3950,7 @@ public final class ActiveServices {
     void serviceForegroundCrash(ProcessRecord app, CharSequence serviceRecord) {
         mAm.crashApplication(app.uid, app.pid, app.info.packageName, app.userId,
                 "Context.startForegroundService() did not then call Service.startForeground(): "
-                    + serviceRecord);
+                    + serviceRecord, false /*force*/);
     }
 
     void scheduleServiceTimeoutLocked(ProcessRecord proc) {
@@ -3930,6 +3962,8 @@ public final class ActiveServices {
         msg.obj = proc;
         mAm.mHandler.sendMessageDelayed(msg,
                 proc.execServicesFg ? SERVICE_TIMEOUT : SERVICE_BACKGROUND_TIMEOUT);
+        /// M: ANR Debug Mechanism
+        mAm.mAnrManager.sendServiceMonitorMessage();
     }
 
     void scheduleServiceForegroundTransitionTimeoutLocked(ServiceRecord r) {

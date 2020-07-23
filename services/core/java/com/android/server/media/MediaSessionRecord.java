@@ -38,6 +38,7 @@ import android.media.session.MediaSession.QueueItem;
 import android.media.session.PlaybackState;
 import android.net.Uri;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.DeadObjectException;
 import android.os.Handler;
@@ -64,7 +65,9 @@ import java.util.List;
  */
 public class MediaSessionRecord implements IBinder.DeathRecipient {
     private static final String TAG = "MediaSessionRecord";
-    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
+    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG)
+            || "eng".equals(Build.TYPE)
+            || "userdebug".equals(Build.TYPE);
 
     /**
      * The amount of time we'll send an assumed volume after the last volume

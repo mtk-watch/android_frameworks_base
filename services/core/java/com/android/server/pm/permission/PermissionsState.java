@@ -871,4 +871,29 @@ public final class PermissionsState {
             return mFlags;
         }
     }
+
+    /// M: CTA requirement - permission control  @{
+    public void updateReviewRequiredCache(int userId) {
+        if (mPermissions == null) {
+            return;
+        }
+        int flags = 0;
+        for (PermissionData permissionData : mPermissions.values()) {
+            flags = permissionData.getFlags(userId);
+            if ((flags & PackageManager.FLAG_PERMISSION_REVIEW_REQUIRED) != 0) {
+                if (mPermissionReviewRequired == null) {
+                    mPermissionReviewRequired = new SparseBooleanArray();
+                }
+                mPermissionReviewRequired.put(userId, true);
+                return;
+            }
+        }
+        if (mPermissionReviewRequired != null) {
+            mPermissionReviewRequired.delete(userId);
+            if (mPermissionReviewRequired.size() <= 0) {
+                mPermissionReviewRequired = null;
+            }
+        }
+    }
+    //@}
 }

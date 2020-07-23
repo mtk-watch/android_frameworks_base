@@ -46,7 +46,8 @@ class BluetoothService extends SystemService {
         if (phase == SystemService.PHASE_SYSTEM_SERVICES_READY) {
             publishBinderService(BluetoothAdapter.BLUETOOTH_MANAGER_SERVICE,
                     mBluetoothManagerService);
-        } else if (phase == SystemService.PHASE_ACTIVITY_MANAGER_READY &&
+        // M: delay boot phase for hci log storage
+        } else if (phase == SystemService.PHASE_BOOT_COMPLETED &&
                 !RoSystemProperties.MULTIUSER_HEADLESS_SYSTEM_USER) {
             initialize();
         }

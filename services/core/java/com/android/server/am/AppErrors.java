@@ -60,6 +60,9 @@ import com.android.server.PackageWatchdog;
 import com.android.server.RescueParty;
 import com.android.server.wm.WindowProcessController;
 
+import com.mediatek.cta.CtaManager;
+import com.mediatek.cta.CtaManagerFactory;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.Collections;
@@ -314,20 +317,24 @@ class AppErrors {
     }
 
     void killAppAtUserRequestLocked(ProcessRecord app, Dialog fromDialog) {
-        app.setCrashing(false);
-        app.crashingReport = null;
-        app.setNotResponding(false);
-        app.notRespondingReport = null;
         if (app.anrDialog == fromDialog) {
             app.anrDialog = null;
         }
         if (app.waitDialog == fromDialog) {
             app.waitDialog = null;
         }
+        killAppImmediateLocked(app, "user-terminated", "user request after error");
+    }
+
+    private void killAppImmediateLocked(ProcessRecord app, String reason, String killReason) {
+        app.setCrashing(false);
+        app.crashingReport = null;
+        app.setNotResponding(false);
+        app.notRespondingReport = null;
         if (app.pid > 0 && app.pid != MY_PID) {
-            handleAppCrashLocked(app, "user-terminated" /*reason*/,
+            handleAppCrashLocked(app, reason,
                     null /*shortMsg*/, null /*longMsg*/, null /*stackTrace*/, null /*data*/);
-            app.kill("user request after error", true);
+            app.kill(killReason, true);
         }
     }
 
@@ -341,7 +348,7 @@ class AppErrors {
      * @param message
      */
     void scheduleAppCrashLocked(int uid, int initialPid, String packageName, int userId,
-            String message) {
+            String message, boolean force) {
         ProcessRecord proc = null;
 
         // Figure out which process to kill.  We don't trust that initialPid
@@ -374,6 +381,14 @@ class AppErrors {
         }
 
         proc.scheduleCrash(message);
+        if (force) {
+            // If the app is responsive, the scheduled crash will happen as expected
+            // and then the delayed summary kill will be a no-op.
+            final ProcessRecord p = proc;
+            mService.mHandler.postDelayed(
+                    () -> killAppImmediateLocked(p, "forced", "killed for invalid state"),
+                    5000L);
+        }
     }
 
     /**
@@ -810,9 +825,12 @@ class AppErrors {
                 }
                 return;
             }
-            final boolean showFirstCrash = Settings.Global.getInt(
-                    mContext.getContentResolver(),
-                    Settings.Global.SHOW_FIRST_CRASH_DIALOG, 0) != 0;
+            /// M: CTA requirement - permission error dialog @{
+            CtaManager manager = CtaManagerFactory.getInstance().makeCtaManager();
+            final boolean showFirstCrash = manager.isCtaSupported() ? true
+                    : (Settings.Global.getInt(mContext.getContentResolver(),
+                            Settings.Global.SHOW_FIRST_CRASH_DIALOG, 0) != 0);
+            //@}
             final boolean showFirstCrashDevOption = Settings.Secure.getIntForUser(
                     mContext.getContentResolver(),
                     Settings.Secure.SHOW_FIRST_CRASH_DIALOG_DEV_OPTION,
@@ -824,6 +842,17 @@ class AppErrors {
                     && !crashSilenced
                     && (showFirstCrash || showFirstCrashDevOption || data.repeating)) {
                 proc.crashDialog = dialogToShow = new AppErrorDialog(mContext, mService, data);
+                /// M: CTA requirement - permission error dialog @{
+                String exceptionMsg = "";
+                if (proc.crashingReport != null) {
+                    exceptionMsg = proc.crashingReport.longMsg;
+                }
+                boolean display = manager.showPermErrorDialog(mContext,
+                        proc.uid, proc.processName, proc.info.packageName, exceptionMsg);
+                if (display) {
+                    return;
+                }
+                //@}
             } else {
                 // The device is asleep, so just pretend that the user
                 // saw a crash dialog and hit "force quit".

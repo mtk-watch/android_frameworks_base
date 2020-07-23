@@ -18,6 +18,8 @@ package com.android.server.display;
 
 import com.android.internal.util.DumpUtils;
 
+import com.mediatek.server.display.MtkWifiDisplayController;
+
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -67,9 +69,9 @@ import java.util.Objects;
  * The controller must be instantiated on the handler thread.
  * </p>
  */
-final class WifiDisplayController implements DumpUtils.Dump {
+public final class WifiDisplayController implements DumpUtils.Dump {
     private static final String TAG = "WifiDisplayController";
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = true;
 
     private static final int DEFAULT_CONTROL_PORT = 7236;
     private static final int MAX_THROUGHPUT = 50;
@@ -102,7 +104,7 @@ final class WifiDisplayController implements DumpUtils.Dump {
     private boolean mWfdEnabling;
     private NetworkInfo mNetworkInfo;
 
-    private final ArrayList<WifiP2pDevice> mAvailableWifiDisplayPeers =
+    public final ArrayList<WifiP2pDevice> mAvailableWifiDisplayPeers =
             new ArrayList<WifiP2pDevice>();
 
     // True if Wifi display is enabled by the user.
@@ -119,7 +121,7 @@ final class WifiDisplayController implements DumpUtils.Dump {
 
     // The device to which we are currently connecting, or null if we have already connected
     // or are not trying to connect.
-    private WifiP2pDevice mConnectingDevice;
+    public WifiP2pDevice mConnectingDevice;
 
     // The device from which we are currently disconnecting.
     private WifiP2pDevice mDisconnectingDevice;
@@ -128,7 +130,7 @@ final class WifiDisplayController implements DumpUtils.Dump {
     private WifiP2pDevice mCancelingDevice;
 
     // The device to which we are currently connected, which means we have an active P2P group.
-    private WifiP2pDevice mConnectedDevice;
+    public WifiP2pDevice mConnectedDevice;
 
     // The group info obtained after connecting.
     private WifiP2pGroup mConnectedDeviceGroupInfo;
@@ -158,6 +160,8 @@ final class WifiDisplayController implements DumpUtils.Dump {
     private int mWifiDisplayWpsConfig = WpsInfo.INVALID;
 
     private WifiP2pDevice mThisDevice;
+
+    private MtkWifiDisplayController mMtkController;
 
     public WifiDisplayController(Context context, Handler handler, Listener listener) {
         mContext = context;
@@ -189,6 +193,9 @@ final class WifiDisplayController implements DumpUtils.Dump {
         resolver.registerContentObserver(Settings.Global.getUriFor(
                 Settings.Global.WIFI_DISPLAY_WPS_CONFIG), false, settingsObserver);
         updateSettings();
+
+        /// M: Init MtkWifiDisplayController.
+        mMtkController = new MtkWifiDisplayController(mContext, mHandler, this);
     }
 
     private void updateSettings() {
@@ -687,6 +694,9 @@ final class WifiDisplayController implements DumpUtils.Dump {
             // Helps with STA & P2P concurrency
             config.groupOwnerIntent = WifiP2pConfig.MIN_GROUP_OWNER_INTENT;
 
+            /// M: overwirte config.
+            config = mMtkController.overWriteConfig(config);
+
             WifiDisplay display = createWifiDisplay(mConnectingDevice);
             advertiseDisplay(display, null, 0, 0, 0);
 
@@ -882,6 +892,8 @@ final class WifiDisplayController implements DumpUtils.Dump {
             // Perform a fresh scan.
             if (mWfdEnabled) {
                 requestPeers();
+                /// M: Reconnect
+                mMtkController.checkReConnect();
             }
         }
     }
@@ -962,8 +974,10 @@ final class WifiDisplayController implements DumpUtils.Dump {
                 public void run() {
                     if (oldSurface != null && surface != oldSurface) {
                         mListener.onDisplayDisconnected();
+                        mMtkController.setWFD(false); /// M: MTK Power: FPSGO Mechanism
                     } else if (oldDisplay != null && !oldDisplay.hasSameAddress(display)) {
                         mListener.onDisplayConnectionFailed();
+                        mMtkController.setWFD(false); /// M: MTK Power: FPSGO Mechanism
                     }
 
                     if (display != null) {
@@ -976,6 +990,7 @@ final class WifiDisplayController implements DumpUtils.Dump {
                         }
                         if (surface != null && surface != oldSurface) {
                             mListener.onDisplayConnected(display, surface, width, height, flags);
+                            mMtkController.setWFD(true); /// M: MTK Power: FPSGO Mechanism
                         }
                     }
                 }

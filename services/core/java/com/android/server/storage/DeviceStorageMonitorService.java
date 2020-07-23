@@ -177,64 +177,67 @@ public class DeviceStorageMonitorService extends SystemService {
         final StorageManager storage = getContext().getSystemService(StorageManager.class);
         final int seq = mSeq.get();
 
-        // Check every mounted private volume to see if they're low on space
-        for (VolumeInfo vol : storage.getWritablePrivateVolumes()) {
-            final File file = vol.getPath();
-            final long fullBytes = storage.getStorageFullBytes(file);
-            final long lowBytes = storage.getStorageLowBytes(file);
+        if(storage != null) {
+            // Check every mounted private volume to see if they're low on space
+            for (VolumeInfo vol : storage.getWritablePrivateVolumes()) {
+                final File file = vol.getPath();
+                final long fullBytes = storage.getStorageFullBytes(file);
+                final long lowBytes = storage.getStorageLowBytes(file);
 
-            // Automatically trim cached data when nearing the low threshold;
-            // when it's within 150% of the threshold, we try trimming usage
-            // back to 200% of the threshold.
-            if (file.getUsableSpace() < (lowBytes * 3) / 2) {
-                final PackageManagerService pms = (PackageManagerService) ServiceManager
-                        .getService("package");
-                try {
-                    pms.freeStorage(vol.getFsUuid(), lowBytes * 2, 0);
-                } catch (IOException e) {
-                    Slog.w(TAG, e);
+                // Automatically trim cached data when nearing the low threshold;
+                // when it's within 150% of the threshold, we try trimming usage
+                // back to 200% of the threshold.
+                if (file.getUsableSpace() < (lowBytes * 3) / 2) {
+                    final PackageManagerService pms = (PackageManagerService) ServiceManager
+                                                                       .getService("package");
+                    try {
+                        pms.freeStorage(vol.getFsUuid(), lowBytes * 2, 0);
+                    } catch (IOException e) {
+                        Slog.w(TAG, e);
+                    }
                 }
-            }
 
-            // Send relevant broadcasts and show notifications based on any
-            // recently noticed state transitions.
-            final UUID uuid = StorageManager.convert(vol.getFsUuid());
-            final State state = findOrCreateState(uuid);
-            final long totalBytes = file.getTotalSpace();
-            final long usableBytes = file.getUsableSpace();
+                // Send relevant broadcasts and show notifications based on any
+                // recently noticed state transitions.
+                final UUID uuid = StorageManager.convert(vol.getFsUuid());
+                final State state = findOrCreateState(uuid);
+                final long totalBytes = file.getTotalSpace();
+                final long usableBytes = file.getUsableSpace();
 
-            int oldLevel = state.level;
-            int newLevel;
-            if (mForceLevel != State.LEVEL_UNKNOWN) {
-                // When in testing mode, use unknown old level to force sending
-                // of any relevant broadcasts.
-                oldLevel = State.LEVEL_UNKNOWN;
-                newLevel = mForceLevel;
-            } else if (usableBytes <= fullBytes) {
-                newLevel = State.LEVEL_FULL;
-            } else if (usableBytes <= lowBytes) {
-                newLevel = State.LEVEL_LOW;
-            } else if (StorageManager.UUID_DEFAULT.equals(uuid) && !isBootImageOnDisk()
-                    && usableBytes < BOOT_IMAGE_STORAGE_REQUIREMENT) {
-                newLevel = State.LEVEL_LOW;
-            } else {
-                newLevel = State.LEVEL_NORMAL;
-            }
+                int oldLevel = state.level;
+                int newLevel;
+                if (mForceLevel != State.LEVEL_UNKNOWN) {
+                    // When in testing mode, use unknown old level to force sending
+                    // of any relevant broadcasts.
+                    oldLevel = State.LEVEL_UNKNOWN;
+                    newLevel = mForceLevel;
+                } else if (usableBytes <= fullBytes) {
+                    newLevel = State.LEVEL_FULL;
+                } else if (usableBytes <= lowBytes) {
+                    newLevel = State.LEVEL_LOW;
+                } else if (StorageManager.UUID_DEFAULT.equals(uuid) && !isBootImageOnDisk()
+                                           && usableBytes < BOOT_IMAGE_STORAGE_REQUIREMENT) {
+                    newLevel = State.LEVEL_LOW;
+                } else {
+                    newLevel = State.LEVEL_NORMAL;
+                }
 
-            // Log whenever we notice drastic storage changes
-            if ((Math.abs(state.lastUsableBytes - usableBytes) > DEFAULT_LOG_DELTA_BYTES)
+                // Log whenever we notice drastic storage changes
+                if ((Math.abs(state.lastUsableBytes - usableBytes) > DEFAULT_LOG_DELTA_BYTES)
                     || oldLevel != newLevel) {
-                EventLogTags.writeStorageState(uuid.toString(), oldLevel, newLevel,
-                        usableBytes, totalBytes);
-                state.lastUsableBytes = usableBytes;
+                    EventLogTags.writeStorageState(uuid.toString(), oldLevel, newLevel,
+                                                                     usableBytes, totalBytes);
+                    state.lastUsableBytes = usableBytes;
+                }
+
+                updateNotifications(vol, oldLevel, newLevel);
+                updateBroadcasts(vol, oldLevel, newLevel, seq);
+
+                state.level = newLevel;
             }
-
-            updateNotifications(vol, oldLevel, newLevel);
-            updateBroadcasts(vol, oldLevel, newLevel, seq);
-
-            state.level = newLevel;
+        } else {
+            Slog.w(TAG, "StorageManager service not ready !!!");
         }
-
         // Loop around to check again in future; we don't remove messages since
         // there might be an immediate request pending.
         if (!mHandler.hasMessages(MSG_CHECK)) {

@@ -105,6 +105,8 @@ import com.android.internal.os.ClassLoaderFactory;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.XmlUtils;
 
+import com.mediatek.cta.CtaManagerFactory;
+
 import libcore.io.IoUtils;
 import libcore.util.EmptyArray;
 
@@ -2537,6 +2539,9 @@ public class PackageParser {
             adjustPackageToBeUnresizeableAndUnpipable(pkg);
         }
 
+        /// M: CTA requirement - permission control  @{
+        CtaManagerFactory.getInstance().makeCtaManager().linkCtaPermissions(pkg);
+        //@}
         return pkg;
     }
 

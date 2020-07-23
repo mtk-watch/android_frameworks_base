@@ -260,6 +260,14 @@ public class UsbManager {
     public static final String USB_FUNCTION_ACCESSORY = "accessory";
 
     /**
+     * Name of the BYPASS USB function.
+     * Used in extras for the {@link #ACTION_USB_STATE} broadcast
+     *
+     * {@hide}
+     */
+    public static final String USB_FUNCTION_BYPASS = "via_bypass";
+
+    /**
      * Name of extra for {@link #ACTION_USB_PORT_CHANGED}
      * containing the {@link UsbPort} object for the port.
      *
@@ -363,8 +371,14 @@ public class UsbManager {
      */
     public static final long FUNCTION_ADB = GadgetFunction.ADB;
 
+    /**
+    * Code for the bypass function. Prevent duplicate definition with GadgetFunction
+    * {@hide}
+    */
+    public static final long FUNCTION_BYPASS = 1 << 15;
+
     private static final long SETTABLE_FUNCTIONS = FUNCTION_MTP | FUNCTION_PTP | FUNCTION_RNDIS
-            | FUNCTION_MIDI;
+            | FUNCTION_MIDI | FUNCTION_BYPASS;
 
     private static final Map<String, Long> FUNCTION_NAME_TO_CODE = new HashMap<>();
 
@@ -376,6 +390,7 @@ public class UsbManager {
         FUNCTION_NAME_TO_CODE.put(UsbManager.USB_FUNCTION_ACCESSORY, FUNCTION_ACCESSORY);
         FUNCTION_NAME_TO_CODE.put(UsbManager.USB_FUNCTION_AUDIO_SOURCE, FUNCTION_AUDIO_SOURCE);
         FUNCTION_NAME_TO_CODE.put(UsbManager.USB_FUNCTION_ADB, FUNCTION_ADB);
+        FUNCTION_NAME_TO_CODE.put(UsbManager.USB_FUNCTION_BYPASS, FUNCTION_BYPASS);
     }
 
     private final Context mContext;
@@ -929,6 +944,9 @@ public class UsbManager {
         }
         if ((functions & FUNCTION_ADB) != 0) {
             joiner.add(UsbManager.USB_FUNCTION_ADB);
+        }
+        if ((functions & FUNCTION_BYPASS) != 0) {
+            joiner.add(UsbManager.USB_FUNCTION_BYPASS);
         }
         return joiner.toString();
     }

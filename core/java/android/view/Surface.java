@@ -31,6 +31,9 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.Log;
 
+import com.mediatek.view.SurfaceExt;
+import com.mediatek.view.SurfaceFactory;
+
 import dalvik.system.CloseGuard;
 
 import java.lang.annotation.Retention;
@@ -128,6 +131,10 @@ public class Surface implements Parcelable {
     private boolean mIsSingleBuffered;
     private boolean mIsSharedBufferModeEnabled;
     private boolean mIsAutoRefreshEnabled;
+    /// M: add for white list @{
+    private SurfaceExt mSurfaceExt = SurfaceFactory.getInstance().
+            getSurfaceExt();
+    /// @}
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -360,6 +367,12 @@ public class Surface implements Parcelable {
     public Canvas lockCanvas(Rect inOutDirty)
             throws Surface.OutOfResourcesException, IllegalArgumentException {
         synchronized (mLock) {
+            /// M: add for white list @{
+            if (mSurfaceExt.isInWhiteList()) {
+                return lockHardwareCanvas();
+            }
+            /// @}
+            Log.d(TAG, "lockCanvas");
             checkNotReleasedLocked();
             if (mLockedObject != 0) {
                 // Ideally, nativeLockCanvas() would throw in this situation and prevent the
@@ -431,6 +444,7 @@ public class Surface implements Parcelable {
      * @throws IllegalStateException If the canvas cannot be locked.
      */
     public Canvas lockHardwareCanvas() {
+        Log.d(TAG, "lockHardwareCanvas");
         synchronized (mLock) {
             checkNotReleasedLocked();
             if (mHwuiContext == null) {

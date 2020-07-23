@@ -31,6 +31,10 @@ import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 import android.view.Surface;
 
+/// M: WindowManager debug Mechanism
+import com.mediatek.server.wm.WindowManagerDebugger;
+import com.mediatek.server.MtkSystemServiceFactory;
+
 import java.io.PrintWriter;
 import java.util.List;
 
@@ -64,6 +68,10 @@ public abstract class WindowOrientationListener {
     private int mCurrentRotation = -1;
 
     private final Object mLock = new Object();
+
+    /// M: Add WindowManager debug Mechanism
+    private WindowManagerDebugger mWindowManagerDebugger =
+                    MtkSystemServiceFactory.getInstance().makeWindowManagerDebugger();
 
     /**
      * Creates a new WindowOrientationListener.
@@ -126,6 +134,9 @@ public abstract class WindowOrientationListener {
                 mOrientationJudge = new AccelSensorJudge(context);
             }
         }
+        if (mWindowManagerDebugger.WMS_DEBUG_USER) {
+            Slog.d(TAG, "ctor: " + this);
+        }
     }
 
     /**
@@ -152,7 +163,7 @@ public abstract class WindowOrientationListener {
             if (mEnabled) {
                 return;
             }
-            if (LOG) {
+            if (LOG || mWindowManagerDebugger.WMS_DEBUG_USER) {
                 Slog.d(TAG, "WindowOrientationListener enabled clearCurrentRotation="
                         + clearCurrentRotation);
             }
@@ -177,7 +188,7 @@ public abstract class WindowOrientationListener {
                 return;
             }
             if (mEnabled == true) {
-                if (LOG) {
+                if (LOG || mWindowManagerDebugger.WMS_DEBUG_USER) {
                     Slog.d(TAG, "WindowOrientationListener disabled");
                 }
                 mSensorManager.unregisterListener(mOrientationJudge);
@@ -811,7 +822,7 @@ public abstract class WindowOrientationListener {
 
             // Tell the listener.
             if (proposedRotation != oldProposedRotation && proposedRotation >= 0) {
-                if (LOG) {
+                if (LOG || mWindowManagerDebugger.WMS_DEBUG_USER) {
                     Slog.v(TAG, "Proposed rotation changed!  proposedRotation=" + proposedRotation
                             + ", oldProposedRotation=" + oldProposedRotation);
                 }
@@ -1052,6 +1063,10 @@ public abstract class WindowOrientationListener {
                 newRotation = evaluateRotationChangeLocked();
             }
             if (newRotation >=0) {
+                if (mWindowManagerDebugger.WMS_DEBUG_USER) {
+                    Slog.v(TAG, "Proposed rotation changed!  mDesiredRotation=" +
+                            mDesiredRotation + ", newRotation=" + newRotation);
+                }
                 onProposedRotationChanged(newRotation);
             }
         }
@@ -1155,6 +1170,9 @@ public abstract class WindowOrientationListener {
                     newRotation = evaluateRotationChangeLocked();
                 }
                 if (newRotation >= 0) {
+                    if (mWindowManagerDebugger.WMS_DEBUG_USER) {
+                        Slog.v(TAG, "Proposed rotation changed!  newRotation=" + newRotation);
+                    }
                     onProposedRotationChanged(newRotation);
                 }
             }

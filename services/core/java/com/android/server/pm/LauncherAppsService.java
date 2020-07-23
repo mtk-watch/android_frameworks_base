@@ -73,6 +73,9 @@ import com.android.server.LocalServices;
 import com.android.server.SystemService;
 import com.android.server.wm.ActivityTaskManagerInternal;
 
+import com.mediatek.server.MtkSystemServiceFactory;
+import com.mediatek.server.pm.PmsExt;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -131,6 +134,9 @@ public class LauncherAppsService extends SystemService {
         private final Handler mCallbackHandler;
 
         private PackageInstallerService mPackageInstallerService;
+
+        /// M: Removable system app support
+        private PmsExt mPmsExt = MtkSystemServiceFactory.getInstance().makePmsExt();
 
         public LauncherAppsImpl(Context context) {
             mContext = context;
@@ -443,45 +449,39 @@ public class LauncherAppsService extends SystemService {
             if (isManagedProfileAdmin(user, appInfo.packageName)) {
                 return false;
             }
-            // If app does not have any components or any permissions, the app can legitimately
-            // have no icon so we do not show the synthetic activity.
-            return hasComponentsAndRequestsPermissions(appInfo.packageName);
-        }
-
-        private boolean hasComponentsAndRequestsPermissions(@NonNull String packageName) {
             final PackageManagerInternal pmInt =
                     LocalServices.getService(PackageManagerInternal.class);
-            final PackageParser.Package pkg = pmInt.getPackage(packageName);
+            final PackageParser.Package pkg = pmInt.getPackage(appInfo.packageName);
             if (pkg == null) {
                 // Should not happen, but we shouldn't be failing if it does
                 return false;
             }
-            if (ArrayUtils.isEmpty(pkg.requestedPermissions)) {
-                return false;
-            }
-            if (!hasApplicationDeclaredActivities(pkg)
-                    && ArrayUtils.isEmpty(pkg.receivers)
-                    && ArrayUtils.isEmpty(pkg.providers)
-                    && ArrayUtils.isEmpty(pkg.services)) {
-                return false;
-            }
-            return true;
+            // If app does not have any default enabled launcher activity or any permissions,
+            // the app can legitimately have no icon so we do not show the synthetic activity.
+            return requestsPermissions(pkg) && hasDefaultEnableLauncherActivity(
+                    appInfo.packageName);
         }
 
-        private boolean hasApplicationDeclaredActivities(@NonNull PackageParser.Package pkg) {
-            if (pkg.activities == null) {
-                return false;
+        private boolean requestsPermissions(@NonNull PackageParser.Package pkg) {
+            return !ArrayUtils.isEmpty(pkg.requestedPermissions);
+        }
+
+        private boolean hasDefaultEnableLauncherActivity(@NonNull String packageName) {
+            final PackageManagerInternal pmInt =
+                    LocalServices.getService(PackageManagerInternal.class);
+            final Intent matchIntent = new Intent(Intent.ACTION_MAIN);
+            matchIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+            matchIntent.setPackage(packageName);
+            final List<ResolveInfo> infoList = pmInt.queryIntentActivities(matchIntent,
+                    PackageManager.MATCH_DISABLED_COMPONENTS, Binder.getCallingUid(),
+                    getCallingUserId());
+            final int size = infoList.size();
+            for (int i = 0; i < size; i++) {
+                if (infoList.get(i).activityInfo.enabled) {
+                    return true;
+                }
             }
-            if (ArrayUtils.isEmpty(pkg.activities)) {
-                return false;
-            }
-            // If it only contains synthetic AppDetailsActivity only, it means application does
-            // not have actual activity declared in manifest.
-            if (pkg.activities.size() == 1 && PackageManager.APP_DETAILS_ACTIVITY_CLASS_NAME.equals(
-                    pkg.activities.get(0).className)) {
-                return false;
-            }
-            return true;
+            return false;
         }
 
         private boolean isManagedProfileAdmin(UserHandle user, String packageName) {
@@ -512,16 +512,22 @@ public class LauncherAppsService extends SystemService {
 
             final int callingUid = injectBinderCallingUid();
             long ident = Binder.clearCallingIdentity();
+            /// M: Removable system app support
+            ActivityInfo retInfo = null;
             try {
                 final PackageManagerInternal pmInt =
                         LocalServices.getService(PackageManagerInternal.class);
-                return pmInt.getActivityInfo(component,
+                retInfo = pmInt.getActivityInfo(component,
                         PackageManager.MATCH_DIRECT_BOOT_AWARE
                                 | PackageManager.MATCH_DIRECT_BOOT_UNAWARE,
                         callingUid, user.getIdentifier());
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }
+            /// M: Removable system app support
+            // Update ApplicationInfo in ActivityInfo, clear FLAG_SYSTEM or not by calling UID
+            mPmsExt.updateActivityInfoForRemovable(retInfo);
+            return retInfo;
         }
 
         @Override
@@ -533,24 +539,30 @@ public class LauncherAppsService extends SystemService {
         }
 
         private ParceledListSlice<ResolveInfo> queryActivitiesForUser(String callingPackage,
-                Intent intent, UserHandle user) {
+                Intent intent, UserHandle user) throws RemoteException {
             if (!canAccessProfile(user.getIdentifier(), "Cannot retrieve activities")) {
                 return null;
             }
 
             final int callingUid = injectBinderCallingUid();
             long ident = injectClearCallingIdentity();
+            /// M: Removable system app support
+            List<ResolveInfo> apps;
             try {
                 final PackageManagerInternal pmInt =
                         LocalServices.getService(PackageManagerInternal.class);
-                List<ResolveInfo> apps = pmInt.queryIntentActivities(intent,
+                apps = pmInt.queryIntentActivities(intent,
                         PackageManager.MATCH_DIRECT_BOOT_AWARE
                                 | PackageManager.MATCH_DIRECT_BOOT_UNAWARE,
                         callingUid, user.getIdentifier());
-                return new ParceledListSlice<>(apps);
+                // return new ParceledListSlice<>(apps);
             } finally {
                 injectRestoreCallingIdentity(ident);
             }
+            /// M: Removable system app support
+            // Update ApplicationInfo in ResolveInfo, clear FLAG_SYSTEM or not by calling UID
+            mPmsExt.updateResolveInfoListForRemovable(apps);
+            return new ParceledListSlice<>(apps);
         }
 
         @Override
@@ -619,15 +631,23 @@ public class LauncherAppsService extends SystemService {
 
             final int callingUid = injectBinderCallingUid();
             long ident = Binder.clearCallingIdentity();
+            /// M: Removable system app support
+            ApplicationInfo info;
             try {
                 final PackageManagerInternal pmInt =
                         LocalServices.getService(PackageManagerInternal.class);
-                ApplicationInfo info = pmInt.getApplicationInfo(packageName, flags,
+                info = pmInt.getApplicationInfo(packageName, flags,
                         callingUid, user.getIdentifier());
-                return info;
+                // return info;
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }
+            /// M: Removable system app support
+            // Update ApplicationInfo, clear FLAG_SYSTEM or not by calling UID
+            info = mPmsExt.updateApplicationInfoForRemovable(
+                    AppGlobals.getPackageManager().getNameForUid(Binder.getCallingUid()),
+                    info);
+            return info;
         }
 
         @Override

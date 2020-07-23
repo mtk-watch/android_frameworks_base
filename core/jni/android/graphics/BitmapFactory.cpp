@@ -51,6 +51,11 @@ jfieldID gBitmap_ninePatchInsetsFieldID;
 jclass gBitmapConfig_class;
 jmethodID gBitmapConfig_nativeToConfigMethodID;
 
+#ifdef MTK_IMAGE_ENABLE_PQ_FOR_JPEG
+jfieldID gOptions_postprocFieldID;
+jfieldID gOptions_postprocflagFieldID;
+#endif
+
 using namespace android;
 
 jstring encodedFormatToString(JNIEnv* env, SkEncodedImageFormat format) {
@@ -193,6 +198,11 @@ static jobject doDecode(JNIEnv* env, std::unique_ptr<SkStreamRewindable> stream,
     jobject javaBitmap = NULL;
     sk_sp<SkColorSpace> prefColorSpace = GraphicsJNI::getNativeColorSpace(colorSpaceHandle);
 
+#ifdef MTK_IMAGE_ENABLE_PQ_FOR_JPEG
+    int postproc = 0;
+    int postprocflag = 0;
+#endif
+
     // Update with options supplied by the client.
     if (options != NULL) {
         sampleSize = env->GetIntField(options, gOptions_sampleSizeFieldID);
@@ -219,6 +229,11 @@ static jobject doDecode(JNIEnv* env, std::unique_ptr<SkStreamRewindable> stream,
         isMutable = env->GetBooleanField(options, gOptions_mutableFieldID);
         requireUnpremultiplied = !env->GetBooleanField(options, gOptions_premultipliedFieldID);
         javaBitmap = env->GetObjectField(options, gOptions_bitmapFieldID);
+
+#ifdef MTK_IMAGE_ENABLE_PQ_FOR_JPEG
+        postproc = env->GetBooleanField(options, gOptions_postprocFieldID);
+        postprocflag = env->GetIntField(options, gOptions_postprocflagFieldID);
+#endif
 
         if (env->GetBooleanField(options, gOptions_scaledFieldID)) {
             const int density = env->GetIntField(options, gOptions_densityFieldID);
@@ -298,6 +313,12 @@ static jobject doDecode(JNIEnv* env, std::unique_ptr<SkStreamRewindable> stream,
         env->SetIntField(options, gOptions_widthFieldID, scaledWidth);
         env->SetIntField(options, gOptions_heightFieldID, scaledHeight);
         env->SetObjectField(options, gOptions_mimeFieldID, mimeType);
+
+#ifdef MTK_IMAGE_ENABLE_PQ_FOR_JPEG
+        if (codec->getEncodedFormat() == SkEncodedImageFormat::kJPEG) {
+            codec->setPostProcFlag(postproc | (postprocflag << 4));
+        }
+#endif
 
         jint configID = GraphicsJNI::colorTypeToLegacyBitmapConfig(decodeColorType);
         if (isHardware) {
@@ -660,6 +681,10 @@ int register_android_graphics_BitmapFactory(JNIEnv* env) {
              "Landroid/graphics/ColorSpace;");
     gOptions_mCancelID = GetFieldIDOrDie(env, options_class, "mCancel", "Z");
 
+#ifdef MTK_IMAGE_ENABLE_PQ_FOR_JPEG
+    gOptions_postprocFieldID = GetFieldIDOrDie(env, options_class, "inPostProc", "Z");
+    gOptions_postprocflagFieldID = GetFieldIDOrDie(env, options_class, "inPostProcFlag", "I");
+#endif
     jclass bitmap_class = FindClassOrDie(env, "android/graphics/Bitmap");
     gBitmap_ninePatchInsetsFieldID = GetFieldIDOrDie(env, bitmap_class, "mNinePatchInsets",
             "Landroid/graphics/NinePatch$InsetStruct;");

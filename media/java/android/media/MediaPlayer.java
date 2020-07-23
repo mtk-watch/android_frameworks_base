@@ -40,6 +40,7 @@ import android.os.PersistableBundle;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.SystemProperties;
+import android.os.Build;
 import android.provider.Settings;
 import android.system.ErrnoException;
 import android.system.Os;
@@ -642,6 +643,7 @@ public class MediaPlayer extends PlayerBase
     private boolean mDrmProvisioningInProgress;
     private boolean mPrepareDrmInProgress;
     private ProvisioningThread mDrmProvisioningThread;
+    private static final boolean DEBUG = !"user".equals(Build.TYPE);
 
     /**
      * Default constructor. Consider using one of the create() methods for
@@ -899,6 +901,7 @@ public class MediaPlayer extends PlayerBase
     public static MediaPlayer create(Context context, Uri uri, SurfaceHolder holder,
             AudioAttributes audioAttributes, int audioSessionId) {
 
+        Log.d(TAG, "MediaPlayer create called");
         try {
             MediaPlayer mp = new MediaPlayer();
             final AudioAttributes aa = audioAttributes != null ? audioAttributes :
@@ -1304,6 +1307,8 @@ public class MediaPlayer extends PlayerBase
      */
     public void start() throws IllegalStateException {
         //FIXME use lambda to pass startImpl to superclass
+
+        if (DEBUG) Log.d(TAG, "MediaPlayer start called");
         final int delay = getStartDelayMs();
         if (delay == 0) {
             startImpl();
@@ -1326,6 +1331,8 @@ public class MediaPlayer extends PlayerBase
                 }
             }.start();
         }
+
+       if (DEBUG) Log.d(TAG, "MediaPlayer start end");
     }
 
     private void startImpl() {
@@ -2108,8 +2115,9 @@ public class MediaPlayer extends PlayerBase
         mOnDrmInfoHandlerDelegate = null;
         mOnDrmPreparedHandlerDelegate = null;
         resetDrmState();
-
+        Log.d(TAG, "_release native called");
         _release();
+        Log.d(TAG, "_release native finished");
     }
 
     private native void _release();
@@ -3273,7 +3281,9 @@ public class MediaPlayer extends PlayerBase
     @Override
     protected void finalize() {
         baseRelease();
+        Log.d(TAG, "finalize() native_finalize called");
         native_finalize();
+        Log.d(TAG, "finalize() native_finalize finished");
     }
 
     /* Do not change these values without updating their counterparts
@@ -5514,7 +5524,7 @@ public class MediaPlayer extends PlayerBase
         private HandlerThread mHandlerThread;
 
         /** @hide */
-        public boolean DEBUG = false;
+        public boolean DEBUG = !"user".equals(Build.TYPE);
 
         public TimeProvider(MediaPlayer mp) {
             mPlayer = mp;
@@ -5857,6 +5867,8 @@ public class MediaPlayer extends PlayerBase
 
             @Override
             public void handleMessage(Message msg) {
+                if (DEBUG) Log.d(TAG, "handleMessage_notify msg:(" + msg.what + ", "
+                                  + msg.arg1 + ", " + msg.arg2 + ")");
                 if (msg.what == NOTIFY) {
                     switch (msg.arg1) {
                     case NOTIFY_TIME:

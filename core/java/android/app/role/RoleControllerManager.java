@@ -178,7 +178,7 @@ public class RoleControllerManager {
             RemoteService, IRoleController> {
 
         private static final long UNBIND_DELAY_MILLIS = 15 * 1000;
-        private static final long REQUEST_TIMEOUT_MILLIS = 15 * 1000;
+        private static final long REQUEST_TIMEOUT_MILLIS = 60 * 1000;
 
         /**
          * Create a connection to the remote service

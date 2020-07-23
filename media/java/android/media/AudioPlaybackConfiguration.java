@@ -23,6 +23,7 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.SystemApi;
 import android.os.Binder;
+import android.os.Build;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -41,7 +42,8 @@ import java.util.Objects;
 public final class AudioPlaybackConfiguration implements Parcelable {
     private static final String TAG = new String("AudioPlaybackConfiguration");
 
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = "eng".equals(Build.TYPE)
+        || "userdebug".equals(Build.TYPE);
 
     /** @hide */
     public static final int PLAYER_PIID_INVALID = -1;

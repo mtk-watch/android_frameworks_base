@@ -74,6 +74,11 @@ bool SkiaOpenGLPipeline::draw(const Frame& frame, const SkRect& screenDirty, con
                               bool opaque, const LightInfo& lightInfo,
                               const std::vector<sp<RenderNode>>& renderNodes,
                               FrameInfoVisualizer* profiler) {
+    if (!mEglManager.isSurfaceValid(mEglSurface)) {
+        ALOGW("give up drawing on abandoned surface<%p>", (void*)mEglSurface);
+        return false;
+    }
+
     mEglManager.damageFrame(frame, dirty);
 
     SkColorType colorType = getSurfaceColorType();

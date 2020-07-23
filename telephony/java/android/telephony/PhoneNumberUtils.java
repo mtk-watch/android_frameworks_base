@@ -48,6 +48,11 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/// M: Revise for telephony add on @{
+import dalvik.system.PathClassLoader;
+import java.lang.reflect.Method;
+/// @}
+
 /**
  * Various utilities for dealing with phone number strings.
  */
@@ -107,6 +112,10 @@ public class PhoneNumberUtils {
 
     private static final String BCD_EF_ADN_EXTENDED = "*#,N;";
     private static final String BCD_CALLED_PARTY_EXTENDED = "*#abc";
+
+    /// M: Revise for telephony add-on @{
+    private static Class<?> sMtkPhoneNumberUtils = getMtkPhoneNumberUtils();
+    /// @}
 
     /*
      * global-phone-number = ["+"] 1*( DIGIT / written-sep )
@@ -1727,7 +1736,23 @@ public class PhoneNumberUtils {
     // However, in order to loose match 650-555-1212 and 555-1212, we need to set the min match
     // to 7.
     @UnsupportedAppUsage
-    static final int MIN_MATCH = 7;
+    // M: Revise for telephony add-on @{
+    //static final int MIN_MATCH = 7;
+    static int MIN_MATCH = getMinMatch();
+
+    private static int getMinMatch() {
+        if (sMtkPhoneNumberUtils != null) {
+            try {
+                Method extPhoneNumberMethod = sMtkPhoneNumberUtils.getMethod("getMinMatch",
+                        new Class[0]);
+                return (int) extPhoneNumberMethod.invoke(null);
+            } catch (Exception e) {
+                Rlog.e(LOG_TAG, "No MtkPhoneNumberUtils! Used AOSP for instead!");
+            }
+        }
+        return 7;
+    }
+    /// @}
 
     /**
      * Checks a given number against the list of
@@ -2383,6 +2408,19 @@ public class PhoneNumberUtils {
      */
     @UnsupportedAppUsage
     public static String cdmaCheckAndProcessPlusCode(String dialStr) {
+        /// M: Revise for telephony add-on @{
+        if (sMtkPhoneNumberUtils != null) {
+            try {
+                Method extPhoneNumberMethod = sMtkPhoneNumberUtils.getMethod(
+                        "cdmaCheckAndProcessPlusCode",
+                        new Class[] { String.class});
+                return (String) extPhoneNumberMethod.invoke(null, dialStr);
+            } catch (Exception e) {
+                Rlog.e(LOG_TAG, "No MtkPhoneNumberUtils! Used AOSP for instead! e: " + e);
+            }
+        }
+        /// @}
+
         if (!TextUtils.isEmpty(dialStr)) {
             if (isReallyDialable(dialStr.charAt(0)) &&
                 isNonSeparator(dialStr)) {
@@ -3248,4 +3286,20 @@ public class PhoneNumberUtils {
         }
         return number;
     }
+
+    /// M: Revise for telephony add-on @{
+    private static Class<?> getMtkPhoneNumberUtils() {
+        // Check telephony add on support property
+        if (SystemProperties.get("ro.vendor.mtk_telephony_add_on_policy", "0").equals("0")) {
+            try {
+                String className = "com.mediatek.internal.telephony.MtkPhoneNumberUtils";
+                Class<?> mtkPhoneNumberClass = Class.forName(className);
+                return mtkPhoneNumberClass;
+            } catch (Exception e) {
+                Rlog.e(LOG_TAG, "No MtkPhoneNumberUtils! Used AOSP for instead!");
+            }
+        }
+        return null;
+    }
+    /// @}
 }

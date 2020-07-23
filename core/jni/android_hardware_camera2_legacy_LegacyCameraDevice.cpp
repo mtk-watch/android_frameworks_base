@@ -283,7 +283,9 @@ static status_t produceFrame(const sp<ANativeWindow>& anw,
             }
 
             uint8_t* img = NULL;
-            ALOGV("%s: Lock buffer from %p for write", __FUNCTION__, anw.get());
+            //!++
+            ALOGI("%s: Lock buffer from %p for write", __FUNCTION__, anw.get());
+            //!--
             err = buf->lock(GRALLOC_USAGE_SW_WRITE_OFTEN, (void**)(&img));
             if (err != NO_ERROR) {
                 ALOGE("%s: Error %s (%d) while locking gralloc buffer for write.", __FUNCTION__,
@@ -365,8 +367,9 @@ static status_t produceFrame(const sp<ANativeWindow>& anw,
         ALOGE("%s: Failed to unlock buffer, error %s (%d).", __FUNCTION__, strerror(-err), err);
         return err;
     }
-
-    ALOGV("%s: Queue buffer to %p", __FUNCTION__, anw.get());
+    //!++
+    ALOGI("%s: Queue buffer to %p", __FUNCTION__, anw.get());
+    //!--
     err = anw->queueBuffer(anw.get(), buf->getNativeBuffer(), /*fenceFd*/-1);
     if (err != NO_ERROR) {
         ALOGE("%s: Failed to queue buffer, error %s (%d).", __FUNCTION__, strerror(-err), err);

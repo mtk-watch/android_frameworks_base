@@ -27,6 +27,7 @@ import android.hardware.camera2.params.MeteringRectangle;
 import android.hardware.camera2.utils.ListUtils;
 import android.hardware.camera2.utils.ParamsUtils;
 import android.hardware.camera2.utils.SizeAreaComparator;
+import android.os.SystemProperties;
 import android.util.Size;
 import android.util.SizeF;
 
@@ -225,7 +226,15 @@ public class ParameterUtils {
     }
 
     private static final String TAG = "ParameterUtils";
-    private static final boolean DEBUG = false;
+    //!++
+    public static final boolean DEBUG = SystemProperties.getBoolean(
+            "debug.camera.legacy", false);
+    // For slightly more spammy messages that will get repeated every frame
+    public static final boolean VERBOSE = SystemProperties.getBoolean(
+            "verbose.camera.legacy", false);
+    public static final boolean DEBUG_DUMP = SystemProperties.getBoolean(
+            "debug.camera.legacy.dump", false);
+    //!--
 
     /** getZoomRatios stores zoom ratios in 1/100 increments, e.x. a zoom of 3.2 is 320 */
     private static final int ZOOM_RATIO_MULTIPLIER = 100;

@@ -42,8 +42,10 @@ import static android.hardware.camera2.CaptureResult.*;
 @SuppressWarnings("deprecation")
 public class LegacyResultMapper {
     private static final String TAG = "LegacyResultMapper";
-    private static final boolean DEBUG = false;
-
+    //!++
+    private static final boolean DEBUG = ParameterUtils.DEBUG;
+    private static final boolean DEBUG_DUMP = ParameterUtils.DEBUG_DUMP;
+    //!--
     private LegacyRequest mCachedRequest = null;
     private CameraMetadataNative mCachedResult = null;
 
@@ -89,8 +91,9 @@ public class LegacyResultMapper {
             // sensor.timestamp
             result.set(SENSOR_TIMESTAMP, timestamp);
         }
-
-        if (DEBUG) {
+        //!++
+        if (DEBUG_DUMP) {
+        //!--
             Log.v(TAG, "cachedConvertResultMetadata - cached? " + cached +
                     " timestamp = " + timestamp);
 

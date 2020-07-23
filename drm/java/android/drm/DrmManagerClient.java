@@ -222,7 +222,10 @@ public class DrmManagerClient implements AutoCloseable {
                 case DrmInfoEvent.TYPE_RIGHTS_INSTALLED:
                 case DrmInfoEvent.TYPE_WAIT_FOR_RIGHTS:
                 case DrmInfoEvent.TYPE_ACCOUNT_ALREADY_REGISTERED:
-                case DrmInfoEvent.TYPE_RIGHTS_REMOVED: {
+                case DrmInfoEvent.TYPE_RIGHTS_REMOVED:
+                /// M: add cta5 call back type, include in OMA DRM 1.0 implementation @{
+                case DrmInfoEvent.TYPE_CTA5_CALLBACK: {
+                /// @}
                     info = new DrmInfoEvent(uniqueId, infoType, message);
                     break;
                 }
@@ -262,10 +265,7 @@ public class DrmManagerClient implements AutoCloseable {
     @Override
     protected void finalize() throws Throwable {
         try {
-            if (mCloseGuard != null) {
                 mCloseGuard.warnIfOpen();
-            }
-
             close();
         } finally {
             super.finalize();

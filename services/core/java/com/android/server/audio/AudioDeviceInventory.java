@@ -244,7 +244,10 @@ public final class AudioDeviceInventory {
         }
         AudioService.sDeviceLogger.log(new AudioEventLogger.StringEvent(
                 "onSetHearingAidConnectionState addr=" + address));
-
+        if (AudioService.DEBUG_DEVICES) {
+            Log.d(TAG, "onSetHearingAidConnectionState btDevice=" + address + " state="
+                    + state);
+        }
         synchronized (mConnectedDevices) {
             final String key = DeviceInfo.makeDeviceListKey(AudioSystem.DEVICE_OUT_HEARING_AID,
                     btDevice.getAddress());
@@ -268,7 +271,8 @@ public final class AudioDeviceInventory {
             return;
         }
         if (AudioService.DEBUG_DEVICES) {
-            Log.d(TAG, "onBluetoothA2dpActiveDeviceChange btDevice=" + btDevice);
+            Log.d(TAG, "onBluetoothA2dpActiveDeviceChange btDevice=" + btDevice
+            + " event=" + BtHelper.a2dpDeviceEventToString(event));
         }
         int a2dpVolume = btInfo.getVolume();
         final int a2dpCodec = btInfo.getCodec();
@@ -419,6 +423,19 @@ public final class AudioDeviceInventory {
         if (AudioService.DEBUG_DEVICES) {
             Slog.i(TAG, "handleDeviceConnection(" + connect + " dev:"
                     + Integer.toHexString(device) + " address:" + address
+                    + " name:" + deviceName + ")");
+            // Since, native AF prints the logs in mainlogs
+            String mDeviceInString = "";
+
+            if ((device & AudioSystem.DEVICE_BIT_IN) == AudioSystem.DEVICE_BIT_IN) {
+                mDeviceInString = AudioSystem.getInputDeviceName(device);
+            } else {
+                mDeviceInString = AudioSystem.getOutputDeviceName(device);
+            }
+            Log.i(TAG, "handleDeviceConnection(" + connect + " dev:"
+                    + Integer.toHexString(device)
+                    + "[" + mDeviceInString + "]"
+                    + " address:" + address
                     + " name:" + deviceName + ")");
         }
         synchronized (mConnectedDevices) {
@@ -806,6 +823,17 @@ public final class AudioDeviceInventory {
             Slog.i(TAG, "sendDeviceConnectionIntent(dev:0x" + Integer.toHexString(device)
                     + " state:0x" + Integer.toHexString(state) + " address:" + address
                     + " name:" + deviceName + ");");
+            String mDeviceInString = "";
+            if ((device & AudioSystem.DEVICE_BIT_IN) == AudioSystem.DEVICE_BIT_IN) {
+                mDeviceInString = AudioSystem.getInputDeviceName(device);
+            } else {
+                mDeviceInString = AudioSystem.getOutputDeviceName(device);
+            }
+            Log.i(TAG, "sendDeviceConnectionIntent(dev:0x" + Integer.toHexString(device)
+                    + " state:0x" + Integer.toHexString(state)
+                    + "[" + mDeviceInString + "]"
+                    + " address:" + address
+                    + " name:" + deviceName + ");");
         }
         Intent intent = new Intent();
 
@@ -842,9 +870,31 @@ public final class AudioDeviceInventory {
         }
 
         if (intent.getAction() == null) {
+            if (AudioService.DEBUG_DEVICES) {
+                Log.e(TAG, "Action=null, skip Headset Pluged-out broadcast.");
+            }
             return;
         }
 
+        /**
+        * M: do not send ACTION_HEADSET_PLUG(out) if any of the headset types is still plugged-in.
+        * ALPS03633618 @{
+        */
+        if((state == 0) && (intent.getAction() == Intent.ACTION_HEADSET_PLUG)) {
+            if ((AudioSystem.getDeviceConnectionState(AudioSystem.DEVICE_OUT_USB_HEADSET, "")
+                == AudioSystem.DEVICE_STATE_AVAILABLE)
+                ||(AudioSystem.getDeviceConnectionState(AudioSystem.DEVICE_OUT_WIRED_HEADPHONE, "")
+                == AudioSystem.DEVICE_STATE_AVAILABLE)
+                ||(AudioSystem.getDeviceConnectionState(AudioSystem.DEVICE_OUT_WIRED_HEADSET, "")
+                == AudioSystem.DEVICE_STATE_AVAILABLE)){
+                if (AudioService.DEBUG_DEVICES) {
+                    Log.e(TAG, "Headset Pluged-out broadcast is not send."
+                    + "Still headset is Pluged-in");
+                }
+                    return;
+            }
+        }
+        /// @}
         intent.putExtra(CONNECT_INTENT_KEY_STATE, state);
         intent.putExtra(CONNECT_INTENT_KEY_ADDRESS, address);
         intent.putExtra(CONNECT_INTENT_KEY_PORT_NAME, deviceName);

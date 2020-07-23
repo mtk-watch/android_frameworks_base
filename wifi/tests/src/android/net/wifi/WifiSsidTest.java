@@ -45,6 +45,19 @@ public class WifiSsidTest {
     }
 
     /**
+     * Check that createFromByteArray() works.
+     */
+    @Test
+    public void testCreateFromGbkByteArray() throws Exception {
+        String TEST_GBK_SSID = "Test GBK SSID";
+        byte[] TEST_GBK_SSID_BYTES = TEST_GBK_SSID.getBytes("GBK");
+        WifiSsid wifiSsid = WifiSsid.createFromByteArray(TEST_GBK_SSID_BYTES);
+        wifiSsid.mIsGbkEncoding = true;
+        assertTrue(wifiSsid != null);
+        assertEquals(TEST_GBK_SSID, wifiSsid.toString());
+    }
+
+    /**
      * Verify that SSID created from byte array and string with the same content are equal.
      *
      * @throws Exception

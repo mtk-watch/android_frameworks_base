@@ -27,6 +27,7 @@ import android.os.Parcelable;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.Build;
 import android.util.Log;
 
 import com.android.internal.annotations.GuardedBy;
@@ -46,7 +47,7 @@ public abstract class PlayerBase {
 
     private static final String TAG = "PlayerBase";
     /** Debug app ops */
-    private static final boolean DEBUG_APP_OPS = false;
+    private static final boolean DEBUG_APP_OPS = !"user".equals(Build.TYPE);
     private static final boolean DEBUG = DEBUG_APP_OPS || false;
     private static IAudioService sService; //lazy initialization, use getService()
 

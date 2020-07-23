@@ -652,7 +652,7 @@ public class SparseMappingTable {
     private static void logOrThrow(String message, Throwable th) {
         Slog.e(TAG, message, th);
         if (Build.IS_ENG) {
-            throw new RuntimeException(message, th);
+            //throw new RuntimeException(message, th);
         }
     }
 }

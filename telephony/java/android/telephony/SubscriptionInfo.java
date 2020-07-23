@@ -34,6 +34,7 @@ import android.os.Build;
 import android.os.Parcel;
 import android.os.ParcelUuid;
 import android.os.Parcelable;
+import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -42,6 +43,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+
+/// M: Revise for telephony add on @{
+import dalvik.system.PathClassLoader;
+import java.lang.reflect.Method;
+/// @}
 
 /**
  * A Parcelable class for Subscription Information.
@@ -719,7 +725,7 @@ public class SubscriptionInfo implements Parcelable {
     public static String givePrintableIccid(String iccId) {
         String iccIdToPrint = null;
         if (iccId != null) {
-            if (iccId.length() > 9 && !Build.IS_DEBUGGABLE) {
+            if (iccId.length() > 9 && (!Build.IS_DEBUGGABLE || isPrintableFullIccId())) {
                 iccIdToPrint = iccId.substring(0, 9) + Rlog.pii(false, iccId.substring(9));
             } else {
                 iccIdToPrint = iccId;
@@ -793,5 +799,24 @@ public class SubscriptionInfo implements Parcelable {
                 && mProfileClass == toCompare.mProfileClass
                 && Arrays.equals(mEhplmns, toCompare.mEhplmns)
                 && Arrays.equals(mHplmns, toCompare.mHplmns);
+    }
+
+    private static boolean isPrintableFullIccId() {
+        // Check telephony add on support property
+        if (SystemProperties.get("ro.vendor.mtk_telephony_add_on_policy", "0").equals("0")) {
+            try {
+                String className = "com.mediatek.internal.telephony.MtkSubscriptionInfo";
+                Class<?> mtkSubscriptionInfoClass = Class.forName(className);
+                if (mtkSubscriptionInfoClass != null) {
+                    Method extIsPrintableFullIccIdMethod = mtkSubscriptionInfoClass.getMethod(
+                            "isPrintableFullIccId", new Class[0]);
+                    return (boolean) extIsPrintableFullIccIdMethod.invoke(null);
+                }
+            } catch (Exception e) {
+                Log.e(SubscriptionInfo.class.getSimpleName(), "No MtkSubscriptionInfo!" +
+                        " Used AOSP for instead! e: " + e);
+            }
+        }
+        return false;
     }
 }

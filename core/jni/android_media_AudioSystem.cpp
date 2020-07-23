@@ -493,24 +493,45 @@ static jint
 android_media_AudioSystem_setDeviceConnectionState(JNIEnv *env, jobject thiz, jint device, jint state, jstring device_address, jstring device_name,
                                                    jint codec)
 {
-    const char *c_address = env->GetStringUTFChars(device_address, NULL);
-    const char *c_name = env->GetStringUTFChars(device_name, NULL);
+    /// M: ALPS02342362: Add null pointer check for CheckJNI of art VM @{
+    const char *c_address = NULL;
+    const char *c_name = NULL;
+    if (NULL != device_address) {
+        c_address = env->GetStringUTFChars(device_address, NULL);
+    }
+    if (NULL != device_name) {
+        c_name = env->GetStringUTFChars(device_name, NULL);
+    }
+    /// @}
     int status = check_AudioSystem_Command(AudioSystem::setDeviceConnectionState(static_cast <audio_devices_t>(device),
                                           static_cast <audio_policy_dev_state_t>(state),
                                           c_address, c_name,
                                           static_cast <audio_format_t>(codec)));
-    env->ReleaseStringUTFChars(device_address, c_address);
-    env->ReleaseStringUTFChars(device_name, c_name);
+    /// M: ALPS02342362: Add null pointer check for CheckJNI of art VM @{
+    if (NULL != device_address) {
+        env->ReleaseStringUTFChars(device_address, c_address);
+    }
+    if (NULL != device_name) {
+        env->ReleaseStringUTFChars(device_name, c_name);
+    }
+    /// @}
     return (jint) status;
 }
 
 static jint
 android_media_AudioSystem_getDeviceConnectionState(JNIEnv *env, jobject thiz, jint device, jstring device_address)
 {
-    const char *c_address = env->GetStringUTFChars(device_address, NULL);
+    /// M: ALPS02342362: Add null pointer check for CheckJNI of art VM @{
+    const char *c_address = NULL;
+    if (NULL != device_address) {
+        c_address = env->GetStringUTFChars(device_address, NULL);
+    }
+    /// @}
     int state = static_cast <int>(AudioSystem::getDeviceConnectionState(static_cast <audio_devices_t>(device),
                                           c_address));
-    env->ReleaseStringUTFChars(device_address, c_address);
+    if (NULL != device_address) {
+        env->ReleaseStringUTFChars(device_address, c_address);
+    }
     return (jint) state;
 }
 
@@ -518,12 +539,26 @@ static jint
 android_media_AudioSystem_handleDeviceConfigChange(JNIEnv *env, jobject thiz, jint device, jstring device_address, jstring device_name,
                                                    jint codec)
 {
-    const char *c_address = env->GetStringUTFChars(device_address, NULL);
-    const char *c_name = env->GetStringUTFChars(device_name, NULL);
+    const char *c_address = NULL;
+    const char *c_name = NULL;
+    /// ALPS04280658: Add null pointer check for CheckJNI of art VM @{
+    if (NULL != device_address) {
+        c_address = env->GetStringUTFChars(device_address, NULL);
+    }
+    if (NULL != device_name) {
+        c_name = env->GetStringUTFChars(device_name, NULL);
+    }
+    /// @}
     int status = check_AudioSystem_Command(AudioSystem::handleDeviceConfigChange(static_cast <audio_devices_t>(device),
                                           c_address, c_name, static_cast <audio_format_t>(codec)));
-    env->ReleaseStringUTFChars(device_address, c_address);
-    env->ReleaseStringUTFChars(device_name, c_name);
+    /// ALPS04280658: Add null pointer check for CheckJNI of art VM @{
+    if (NULL != device_address) {
+        env->ReleaseStringUTFChars(device_address, c_address);
+    }
+    if (NULL != device_name) {
+        env->ReleaseStringUTFChars(device_name, c_name);
+    }
+    /// @}
     return (jint) status;
 }
 

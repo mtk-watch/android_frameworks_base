@@ -96,7 +96,10 @@ public class WindowAnimator {
             synchronized (mService.mGlobalLock) {
                 mAnimationFrameCallbackScheduled = false;
             }
+            /// M: add systrace
+            Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER, "wmAnimate");
             animate(frameTimeNs);
+            Trace.traceEnd(Trace.TRACE_TAG_WINDOW_MANAGER);
         };
     }
 

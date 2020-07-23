@@ -48,7 +48,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * data usage has been reported in {@link NetworkStatsService}. An observer can set
  * a threshold of how much data it cares about to be notified.
  */
-class NetworkStatsObservers {
+// M: modify for customiztion of MtkNetworkStatsService.java, make it public
+public class NetworkStatsObservers {
     private static final String TAG = "NetworkStatsObservers";
     private static final boolean LOGV = false;
 

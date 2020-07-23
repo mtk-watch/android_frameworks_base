@@ -55,8 +55,10 @@ import static android.hardware.camera2.legacy.ParameterUtils.*;
 @SuppressWarnings("deprecation")
 public class LegacyMetadataMapper {
     private static final String TAG = "LegacyMetadataMapper";
-    private static final boolean DEBUG = false;
-
+    //!++
+    private static final boolean DEBUG = ParameterUtils.DEBUG;
+    private static final boolean DEBUG_DUMP = ParameterUtils.DEBUG_DUMP;
+    //!--
     private static final long NS_PER_MS = 1000000;
 
     // from graphics.h
@@ -155,8 +157,9 @@ public class LegacyMetadataMapper {
         Camera.Parameters params = Camera.getEmptyParameters();
         params.unflatten(parameters);
         mapCharacteristicsFromParameters(m, params);
-
-        if (DEBUG) {
+        //!++
+        if (DEBUG_DUMP) {
+        //!--
             Log.v(TAG, "createCharacteristics metadata:");
             Log.v(TAG, "--------------------------------------------------- (start)");
             m.dumpToLog();

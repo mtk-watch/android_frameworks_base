@@ -2163,6 +2163,11 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
 
     @Override
     int getOrientation() {
+        /// M: Add more log at WMS
+        if (DEBUG_ORIENTATION) {
+            mWmService.mWindowManagerDebugger.debugGetOrientation(TAG, mWmService.mDisplayFrozen,
+                        mLastWindowForcedOrientation, mLastKeyguardForcedOrientation);
+        }
         final WindowManagerPolicy policy = mWmService.mPolicy;
 
         if (mIgnoreRotationForApps) {
@@ -4664,6 +4669,12 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
                         token2.mOwnerCanManageAppTokens) ? -1 : 1;
 
         private final Predicate<WindowState> mGetOrientingWindow = w -> {
+            /// M: Add more log at WMS
+            if (DEBUG_ORIENTATION) {
+                mWmService.mWindowManagerDebugger.debugGetOrientingWindow(TAG, w,
+                        w.mAttrs, w.isVisibleLw(), w.mLegacyPolicyVisibilityAfterAnim,
+                        w.mPolicyVisibility, w.mDestroying);
+            }
             if (!w.isVisibleLw() || !w.mLegacyPolicyVisibilityAfterAnim) {
                 return false;
             }

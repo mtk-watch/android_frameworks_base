@@ -93,6 +93,9 @@ import com.android.internal.os.BackgroundThread;
 import com.android.internal.os.SomeArgs;
 import com.android.server.LocalServices;
 
+/// M: MtkSystemServer
+import com.mediatek.server.MtkSystemServer;
+
 /**
  * Listens to activity launches, transitions, visibility changes and window drawn callbacks to
  * determine app launch times and draw delays. Source of truth for activity metrics and provides
@@ -779,6 +782,11 @@ class ActivityMetricsLogger {
         sb.append(": ");
         TimeUtils.formatDuration(info.windowsDrawnDelayMs, sb);
         Log.i(TAG, sb.toString());
+        /// M: Boot time profiling @{
+        MtkSystemServer.getInstance().addBootEvent(
+            "AP_Launch: " + info.launchedActivityShortComponentName +
+            " " + info.windowsDrawnDelayMs + "ms");
+        /// M: @}
     }
 
     private int convertAppStartTransitionType(int tronType) {

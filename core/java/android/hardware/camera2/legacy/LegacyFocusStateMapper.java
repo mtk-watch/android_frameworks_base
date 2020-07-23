@@ -38,8 +38,9 @@ import static com.android.internal.util.Preconditions.*;
 @SuppressWarnings("deprecation")
 public class LegacyFocusStateMapper {
     private static String TAG = "LegacyFocusStateMapper";
-    private static final boolean DEBUG = false;
-
+    //!++
+    private static final boolean DEBUG = ParameterUtils.DEBUG;
+    //!--
     private final Camera mCamera;
 
     private int mAfStatePrevious = CONTROL_AF_STATE_INACTIVE;

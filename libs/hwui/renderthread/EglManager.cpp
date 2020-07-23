@@ -103,13 +103,17 @@ void EglManager::initialize() {
 
     ATRACE_NAME("Creating EGLContext");
 
+    TIME_LOG_BEGIN("eglGetDisplay");
     mEglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    TIME_LOG_END();
     LOG_ALWAYS_FATAL_IF(mEglDisplay == EGL_NO_DISPLAY, "Failed to get EGL_DEFAULT_DISPLAY! err=%s",
                         eglErrorString());
 
     EGLint major, minor;
+    TIME_LOG_BEGIN("eglInitialize");
     LOG_ALWAYS_FATAL_IF(eglInitialize(mEglDisplay, &major, &minor) == EGL_FALSE,
                         "Failed to initialize display %p! err=%s", mEglDisplay, eglErrorString());
+    TIME_LOG_END();
 
     ALOGV("Initialized EGL, version %d.%d", (int)major, (int)minor);
 
@@ -131,6 +135,7 @@ void EglManager::initialize() {
     createContext();
     createPBufferSurface();
     makeCurrent(mPBufferSurface, nullptr, /* force */ true);
+    notifyDrvIsHWUI();
 
     skcms_Matrix3x3 wideColorGamut;
     LOG_ALWAYS_FATAL_IF(!DeviceInfo::get()->getWideColorSpace()->toXYZD50(&wideColorGamut),
@@ -171,6 +176,7 @@ EGLConfig EglManager::load8BitsConfig(EGLDisplay display, EglManager::SwapBehavi
                         EGL_NONE};
     EGLConfig config = EGL_NO_CONFIG_KHR;
     EGLint numConfigs = 1;
+    TIME_LOG_CALL();
     if (!eglChooseConfig(display, attribs, &config, numConfigs, &numConfigs) || numConfigs != 1) {
         return EGL_NO_CONFIG_KHR;
     }
@@ -202,6 +208,7 @@ EGLConfig EglManager::loadFP16Config(EGLDisplay display, SwapBehavior swapBehavi
                         EGL_NONE};
     EGLConfig config = EGL_NO_CONFIG_KHR;
     EGLint numConfigs = 1;
+    TIME_LOG_CALL();
     if (!eglChooseConfig(display, attribs, &config, numConfigs, &numConfigs) || numConfigs != 1) {
         return EGL_NO_CONFIG_KHR;
     }
@@ -275,6 +282,7 @@ void EglManager::createContext() {
         contextAttributes.push_back(Properties::contextPriority);
     }
     contextAttributes.push_back(EGL_NONE);
+    TIME_LOG_CALL();
     mEglContext = eglCreateContext(
             mEglDisplay, EglExtensions.noConfigContext ? ((EGLConfig) nullptr) : mEglConfig,
             EGL_NO_CONTEXT, contextAttributes.data());
@@ -288,6 +296,7 @@ void EglManager::createPBufferSurface() {
 
     if (mPBufferSurface == EGL_NO_SURFACE && !EglExtensions.surfacelessContext) {
         EGLint attribs[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
+        TIME_LOG_CALL();
         mPBufferSurface = eglCreatePbufferSurface(mEglDisplay, mEglConfig, attribs);
     }
 }
@@ -342,6 +351,7 @@ Result<EGLSurface, EGLint> EglManager::createSurface(EGLNativeWindowType window,
         }
     }
 
+    TIME_LOG_CALL();
     EGLSurface surface = eglCreateWindowSurface(
             mEglDisplay, wideColorGamut ? mEglConfigWideGamut : mEglConfig, window, attribs);
     if (surface == EGL_NO_SURFACE) {
@@ -362,6 +372,7 @@ void EglManager::destroySurface(EGLSurface surface) {
     if (isCurrent(surface)) {
         makeCurrent(EGL_NO_SURFACE);
     }
+    TIME_LOG_CALL();
     if (!eglDestroySurface(mEglDisplay, surface)) {
         ALOGW("Failed to destroy surface %p, error=%s", (void*)surface, eglErrorString());
     }
@@ -370,6 +381,7 @@ void EglManager::destroySurface(EGLSurface surface) {
 void EglManager::destroy() {
     if (mEglDisplay == EGL_NO_DISPLAY) return;
 
+    TIME_LOG_CALL();
     eglDestroyContext(mEglDisplay, mEglContext);
     if (mPBufferSurface != EGL_NO_SURFACE) {
         eglDestroySurface(mEglDisplay, mPBufferSurface);
@@ -391,6 +403,7 @@ bool EglManager::makeCurrent(EGLSurface surface, EGLint* errOut, bool force) {
         // Ensure we always have a valid surface & context
         surface = mPBufferSurface;
     }
+    TIME_LOG_CALL();
     if (!eglMakeCurrent(mEglDisplay, surface, surface, mEglContext)) {
         if (errOut) {
             *errOut = eglGetError();
@@ -416,6 +429,7 @@ EGLint EglManager::queryBufferAge(EGLSurface surface) {
             return 1;
         case SwapBehavior::BufferAge:
             EGLint bufferAge;
+            TIME_LOG_CALL();
             eglQuerySurface(mEglDisplay, surface, EGL_BUFFER_AGE_EXT, &bufferAge);
             return bufferAge;
     }
@@ -424,9 +438,12 @@ EGLint EglManager::queryBufferAge(EGLSurface surface) {
 
 Frame EglManager::beginFrame(EGLSurface surface) {
     LOG_ALWAYS_FATAL_IF(surface == EGL_NO_SURFACE, "Tried to beginFrame on EGL_NO_SURFACE!");
-    makeCurrent(surface);
+    // Just pass dummy to makeCurrent to get a warning in case surface is disconnected
+    EGLint dummy = 0;
+    makeCurrent(surface, &dummy);
     Frame frame;
     frame.mSurface = surface;
+    TIME_LOG_CALL();
     eglQuerySurface(mEglDisplay, surface, EGL_WIDTH, &frame.mWidth);
     eglQuerySurface(mEglDisplay, surface, EGL_HEIGHT, &frame.mHeight);
     frame.mBufferAge = queryBufferAge(surface);
@@ -437,6 +454,7 @@ Frame EglManager::beginFrame(EGLSurface surface) {
 void EglManager::damageFrame(const Frame& frame, const SkRect& dirty) {
 #ifdef EGL_KHR_partial_update
     if (EglExtensions.setDamage && mSwapBehavior == SwapBehavior::BufferAge) {
+        TIME_LOG_CALL();
         EGLint rects[4];
         frame.map(dirty, rects);
         if (!eglSetDamageRegionKHR(mEglDisplay, frame.mSurface, rects, 1)) {
@@ -459,13 +477,14 @@ bool EglManager::swapBuffers(const Frame& frame, const SkRect& screenDirty) {
 
     EGLint rects[4];
     frame.map(screenDirty, rects);
+    TIME_LOG_CALL();
     eglSwapBuffersWithDamageKHR(mEglDisplay, frame.mSurface, rects, screenDirty.isEmpty() ? 0 : 1);
 
     EGLint err = eglGetError();
     if (CC_LIKELY(err == EGL_SUCCESS)) {
         return true;
     }
-    if (err == EGL_BAD_SURFACE || err == EGL_BAD_NATIVE_WINDOW) {
+    if (err == EGL_BAD_SURFACE || err == EGL_BAD_NATIVE_WINDOW || err == EGL_BAD_ALLOC) {
         // For some reason our surface was destroyed out from under us
         // This really shouldn't happen, but if it does we can recover easily
         // by just not trying to use the surface anymore
@@ -479,12 +498,14 @@ bool EglManager::swapBuffers(const Frame& frame, const SkRect& screenDirty) {
 }
 
 void EglManager::fence() {
+    TIME_LOG_CALL();
     EGLSyncKHR fence = eglCreateSyncKHR(mEglDisplay, EGL_SYNC_FENCE_KHR, NULL);
     eglClientWaitSyncKHR(mEglDisplay, fence, EGL_SYNC_FLUSH_COMMANDS_BIT_KHR, EGL_FOREVER_KHR);
     eglDestroySyncKHR(mEglDisplay, fence);
 }
 
 bool EglManager::setPreserveBuffer(EGLSurface surface, bool preserve) {
+    TIME_LOG_CALL();
     if (mSwapBehavior != SwapBehavior::Preserved) return false;
 
     bool preserved = eglSurfaceAttrib(mEglDisplay, surface, EGL_SWAP_BEHAVIOR,
@@ -601,6 +622,36 @@ status_t EglManager::createReleaseFence(bool useFenceSync, EGLSyncKHR* eglFence,
         glFlush();
     }
     return OK;
+}
+
+///////////////////////////////// MTK ADD /////////////////////////////////
+bool EglManager::isSurfaceValid(EGLSurface surface) {
+    #ifdef EGL_IS_INVALID_MTK
+    TIME_LOG_CALL();
+    int isSurfaceInvalid = 0;
+    EGLBoolean success = eglQuerySurface(mEglDisplay, surface, EGL_IS_INVALID_MTK,
+            &isSurfaceInvalid);
+    if (isSurfaceInvalid || !success) {
+        return false;
+    }
+    #endif
+    return true;
+}
+
+///////////////////////////////// MTK ADD /////////////////////////////////
+void EglManager::notifyDrvIsHWUI() {
+    TIME_LOG_CALL();
+
+    typedef void (*PFNGLEXTHWUIHINTMTKPROC)(bool is_hwui);
+
+    static PFNGLEXTHWUIHINTMTKPROC glExtHwuiHintMTK = NULL;
+    if (glExtHwuiHintMTK == NULL) {
+        glExtHwuiHintMTK = (PFNGLEXTHWUIHINTMTKPROC)eglGetProcAddress("glExtHwuiHintMTK");
+    }
+
+    if (glExtHwuiHintMTK) {
+        glExtHwuiHintMTK(true);
+    }
 }
 
 } /* namespace renderthread */

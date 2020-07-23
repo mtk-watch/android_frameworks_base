@@ -28,6 +28,7 @@ import android.opengl.EGLSurface;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.os.IBinder;
+import android.os.SystemProperties;
 import android.util.Slog;
 import android.view.DisplayInfo;
 import android.view.Surface;
@@ -61,7 +62,7 @@ import java.nio.FloatBuffer;
 final class ColorFade {
     private static final String TAG = "ColorFade";
 
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = SystemProperties.getBoolean("dbg.dms.colorfade", false);
 
     // The layer for the electron beam surface.
     // This is currently hardcoded to be one layer above the boot animation.

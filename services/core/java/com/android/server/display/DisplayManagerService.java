@@ -153,7 +153,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public final class DisplayManagerService extends SystemService {
     private static final String TAG = "DisplayManagerService";
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = SystemProperties.getBoolean("dbg.dms.dms", false);
 
     // When this system property is set to 0, WFD is forcibly disabled on boot.
     // When this system property is set to 1, WFD is forcibly enabled on boot.
@@ -857,7 +857,9 @@ public final class DisplayManagerService extends SystemService {
     private void registerWifiDisplayAdapterLocked() {
         if (mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_enableWifiDisplay)
-                || SystemProperties.getInt(FORCE_WIFI_DISPLAY_ENABLE, -1) == 1) {
+                || SystemProperties.getInt(FORCE_WIFI_DISPLAY_ENABLE, -1) == 1
+                /* M: add for wifidisplay */
+                || SystemProperties.get("ro.vendor.mtk_wfd_support").equals("1")) {
             mWifiDisplayAdapter = new WifiDisplayAdapter(
                     mSyncRoot, mContext, mHandler, mDisplayAdapterListener,
                     mPersistentDataStore);

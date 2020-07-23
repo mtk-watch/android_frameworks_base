@@ -30,11 +30,18 @@ import android.content.Context;
 import android.os.PersistableBundle;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.SystemProperties;
 import android.service.carrier.CarrierService;
 import android.telecom.TelecomManager;
 import android.telephony.ims.ImsReasonInfo;
 
 import com.android.internal.telephony.ICarrierConfigLoader;
+
+/// M: Add proprietary keys by MtkCarrierConfigManager. @{
+import dalvik.system.PathClassLoader;
+import java.lang.reflect.Method;
+/// @}
+
 
 /**
  * Provides access to telephony configuration values that are carrier-specific.
@@ -3407,6 +3414,23 @@ public class CarrierConfigManager {
                         -89,  /* SIGNAL_STRENGTH_GREAT */
                 });
         sDefaults.putBoolean(KEY_SUPPORT_WPS_OVER_IMS_BOOL, true);
+
+        /// M: Add proprietary keys by MtkCarrierConfigManager. @{
+        // Check telephony add on support property
+        if (SystemProperties.get("ro.vendor.mtk_telephony_add_on_policy", "0").equals("0")) {
+            String className = "mediatek.telephony.MtkCarrierConfigManager";
+            try {
+                Class<?> extCarrierConfigManagerClass = Class.forName(className, false,
+                        ClassLoader.getSystemClassLoader());
+                Method extCarrierConfigManagerMethod = extCarrierConfigManagerClass.getMethod(
+                        "putDefault",
+                        new Class[] { PersistableBundle.class });
+                extCarrierConfigManagerMethod.invoke(null, sDefaults);
+            } catch (Exception  e) {
+                Rlog.w(TAG, "No MtkCarrierConfigManager! Do nothing. - " + e);
+            }
+        }
+        /// @}
     }
 
     /**

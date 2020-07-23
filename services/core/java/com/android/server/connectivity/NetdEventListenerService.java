@@ -116,7 +116,9 @@ public class NetdEventListenerService extends INetdEventListener.Stub {
     private static final int[] ALLOWED_CALLBACK_TYPES = {
         INetdEventCallback.CALLBACK_CALLER_CONNECTIVITY_SERVICE,
         INetdEventCallback.CALLBACK_CALLER_DEVICE_POLICY,
-        INetdEventCallback.CALLBACK_CALLER_NETWORK_WATCHLIST
+        INetdEventCallback.CALLBACK_CALLER_NETWORK_WATCHLIST,
+        // M: Support CTA network monitor
+        INetdEventCallback.CALLBACK_CALLER_CTA_NETWORK_MONITOR
     };
 
     @GuardedBy("this")

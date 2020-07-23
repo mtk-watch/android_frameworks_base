@@ -307,6 +307,19 @@ public class ApplicationsState {
                 }
                 mHaveDisabledApps = true;
             }
+             //M: Hide com.android.documentsui
+            if (info.packageName.equals("com.android.documentsui")) {
+                Log.d(TAG, "Removing documentsUI from the Applications list");
+                mApplications.remove(i);
+                i--;
+                continue;
+            }
+            if (info.packageName.equals("com.google.android.documentsui")) {
+                Log.d(TAG, "Removing google documentsUI from the Applications list");
+                mApplications.remove(i);
+                i--;
+                continue;
+            }
             if (isHiddenModule(info.packageName)) {
                 mApplications.remove(i--);
                 continue;
@@ -1180,6 +1193,16 @@ public class ApplicationsState {
                                 for (int j = 0; j < N; j++) {
                                     ResolveInfo resolveInfo = intents.get(j);
                                     String packageName = resolveInfo.activityInfo.packageName;
+                                    //M: Hide com.android.documentsui
+                                    if (packageName.equals("com.android.documentsui")) {
+                                        Log.d(TAG, "ignoring documentsUI as it is hidden");
+                                        continue;
+                                    }
+                                    //M: Hide com.android.documentsui
+                                    if (packageName.equals("com.google.android.documentsui")) {
+                                        Log.d(TAG, "ignoring Google documentsUI as it is hidden");
+                                        continue;
+                                    }
                                     AppEntry entry = userEntries.get(packageName);
                                     if (entry != null) {
                                         entry.hasLauncherEntry = true;

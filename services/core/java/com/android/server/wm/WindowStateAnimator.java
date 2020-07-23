@@ -250,11 +250,12 @@ class WindowStateAnimator {
 
     void onAnimationFinished() {
         // Done animating, clean up.
+        /// M: Add more log at WMS
+        Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER, "win animation done");
         if (DEBUG_ANIM) Slog.v(
                 TAG, "Animation done in " + this + ": exiting=" + mWin.mAnimatingExit
                         + ", reportedVisible="
                         + (mWin.mAppToken != null ? mWin.mAppToken.reportedVisible : false));
-
         mWin.checkPolicyVisibilityChange();
         final DisplayContent displayContent = mWin.getDisplayContent();
         if (mAttrType == LayoutParams.TYPE_STATUS_BAR && mWin.isVisibleByPolicy()) {
@@ -278,6 +279,7 @@ class WindowStateAnimator {
         if (mWin.mAppToken != null) {
             mWin.mAppToken.updateReportedVisibilityLocked();
         }
+         Trace.traceEnd(Trace.TRACE_TAG_WINDOW_MANAGER);
     }
 
     void hide(SurfaceControl.Transaction transaction, String reason) {
@@ -312,7 +314,8 @@ class WindowStateAnimator {
         boolean layoutNeeded = false;
 
         if (mDrawState == DRAW_PENDING) {
-            if (DEBUG_ANIM || SHOW_TRANSACTIONS || DEBUG_ORIENTATION)
+            if (DEBUG_ANIM || SHOW_TRANSACTIONS || DEBUG_ORIENTATION
+                    || mService.mWindowManagerDebugger.WMS_DEBUG_ENG)
                 Slog.v(TAG, "finishDrawingLocked: mDrawState=COMMIT_DRAW_PENDING " + mWin + " in "
                         + mSurfaceController);
             if (DEBUG_STARTING_WINDOW && startingWindow) {
@@ -495,7 +498,8 @@ class WindowStateAnimator {
 
             w.setHasSurface(true);
 
-            if (SHOW_TRANSACTIONS || SHOW_SURFACE_ALLOC) {
+            if (SHOW_TRANSACTIONS || SHOW_SURFACE_ALLOC
+                    || mService.mWindowManagerDebugger.WMS_DEBUG_ENG) {
                 Slog.i(TAG, "  CREATE SURFACE "
                         + mSurfaceController + " IN SESSION "
                         + mSession.mSurfaceSession
@@ -1087,6 +1091,14 @@ class WindowStateAnimator {
 
         setSurfaceBoundariesLocked(recoveringMemory);
 
+         /// M: Add more log at WMS
+        if (SHOW_TRANSACTIONS) {
+            mService.mWindowManagerDebugger.debugPrepareSurfaceLocked(TAG, mIsWallpaper,
+                    mWin, mWin.mWallpaperVisible, w.isOnScreen(),
+                    w.mPolicyVisibility, w.mHasSurface,
+                    w.mDestroying, mLastHidden);
+        }
+
         if (mIsWallpaper && !w.mWallpaperVisible) {
             // Wallpaper is no longer visible and there is no wp target => hide it.
             hide("prepareSurfaceLocked");
@@ -1150,7 +1162,7 @@ class WindowStateAnimator {
                             // LogicalDisplay.
                             mAnimator.setPendingLayoutChanges(w.getDisplayId(),
                                     FINISH_LAYOUT_REDO_ANIM);
-                            if (DEBUG_LAYOUT_REPEATS) {                        
+                            if (DEBUG_LAYOUT_REPEATS) {
                                 mService.mWindowPlacerLocked.debugLayoutRepeats(
                                         "showSurfaceRobustlyLocked " + w,
                                         mAnimator.getPendingLayoutChanges(w.getDisplayId()));

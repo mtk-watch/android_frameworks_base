@@ -112,6 +112,9 @@ final public class IpConnectivityMetrics extends SystemService {
     @GuardedBy("mLock")
     private final ArrayMap<Class<?>, TokenBucket> mBuckets = makeRateLimitingBuckets();
 
+    // M: Support celluar data control by CTA.
+    private android.os.IBinder mBinder;
+
     private final ToIntFunction<Context> mCapacityGetter;
 
     @VisibleForTesting
@@ -140,6 +143,34 @@ final public class IpConnectivityMetrics extends SystemService {
 
             publishBinderService(SERVICE_NAME, impl);
             publishBinderService(mNetdListener.SERVICE_NAME, mNetdListener);
+
+            // M: Framework add on mechanism.
+            // Support celluar data control by CTA. @{
+            try {
+                java.lang.reflect.Method method;
+                dalvik.system.PathClassLoader pcLoader = new dalvik.system.PathClassLoader(
+                        "/system/framework/mediatek-framework-net.jar",
+                        getContext().getClassLoader());
+                Class mtkIpConnClass = pcLoader.loadClass(
+                        "com.mediatek.net.connectivity.MtkIpConnectivityMetrics");
+                java.lang.reflect.Constructor clazzConstructfunc = mtkIpConnClass.getConstructor(
+                        new Class[] {Context.class, NetdEventListenerService.class});
+                clazzConstructfunc.setAccessible(true);
+                Object classObject = (Object) clazzConstructfunc.newInstance(
+                        getContext(), (NetdEventListenerService) mNetdListener);
+
+                method = mtkIpConnClass.getDeclaredMethod("getMtkIpConnSrv");
+                method.setAccessible(true);
+                mBinder = (android.os.IBinder) method.invoke(classObject);
+                if (mBinder == null) {
+                    Log.e(TAG, "mtkIpConnClass is null");
+                    return;
+                }
+                publishBinderService("mtkconnmetrics", mBinder);
+            } catch (Exception e) {
+                Log.d(TAG, "No MtkIpConnectivityMetrics:" + e);
+            }
+            // @}
 
             LocalServices.addService(Logger.class, new LoggerImpl());
         }

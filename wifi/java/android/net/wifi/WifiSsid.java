@@ -49,6 +49,7 @@ public class WifiSsid implements Parcelable {
     private static final int HEX_RADIX = 16;
     @UnsupportedAppUsage
     public static final String NONE = "<unknown ssid>";
+    public boolean mIsGbkEncoding = false;
 
     private WifiSsid() {
     }
@@ -183,6 +184,8 @@ public class WifiSsid implements Parcelable {
         if (octets.size() <= 0 || isArrayAllZeroes(ssidBytes)) return "";
         // TODO: Handle conversion to other charsets upon failure
         Charset charset = Charset.forName("UTF-8");
+        if (mIsGbkEncoding) charset = Charset.forName("GB2312");
+
         CharsetDecoder decoder = charset.newDecoder()
                 .onMalformedInput(CodingErrorAction.REPLACE)
                 .onUnmappableCharacter(CodingErrorAction.REPLACE);
@@ -250,6 +253,7 @@ public class WifiSsid implements Parcelable {
     public void writeToParcel(Parcel dest, int flags) {
         dest.writeInt(octets.size());
         dest.writeByteArray(octets.toByteArray());
+        dest.writeInt(mIsGbkEncoding ? 1 : 0);
     }
 
     /** Implement the Parcelable interface {@hide} */
@@ -262,6 +266,7 @@ public class WifiSsid implements Parcelable {
                 byte b[] = new byte[length];
                 in.readByteArray(b);
                 ssid.octets.write(b, 0, length);
+                ssid.mIsGbkEncoding = in.readInt() != 0;
                 return ssid;
             }
 

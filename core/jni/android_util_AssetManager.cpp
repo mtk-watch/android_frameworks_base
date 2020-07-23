@@ -186,6 +186,18 @@ static void NativeVerifySystemIdmaps(JNIEnv* /*env*/, jclass /*clazz*/) {
           argv[argc++] = overlay_theme_path.c_str();
         }
       }
+      // add for testing rsc
+      // scan for system rsc overlay directory.
+      std::string sys_rsc_overlay_path = base::GetProperty("ro.sys.current_rsc_path", "");
+      LOG(WARNING) << "system rsc path:" << sys_rsc_overlay_path;
+      if (!sys_rsc_overlay_path.empty()) {
+        sys_rsc_overlay_path = sys_rsc_overlay_path + "/overlay";
+        if (stat(sys_rsc_overlay_path.c_str(), &st) == 0) {
+          argv[argc++] = sys_rsc_overlay_path.c_str();
+          LOG(WARNING) << "system rsc overlay path:" << sys_rsc_overlay_path;
+        }
+      }
+      // end
 
       if (stat(AssetManager::VENDOR_OVERLAY_DIR, &st) == 0) {
         argv[argc++] = AssetManager::VENDOR_OVERLAY_DIR;
@@ -248,6 +260,18 @@ static jobjectArray NativeCreateIdmapsForStaticOverlaysTargetingAndroid(JNIEnv* 
   if (stat(AssetManager::OEM_OVERLAY_DIR, &st) == 0) {
     input_dirs.push_back(AssetManager::OEM_OVERLAY_DIR);
   }
+  // add for testing rsc
+  // scan for system rsc overlay directory.
+  std::string sys_rsc_overlay_path = base::GetProperty("ro.sys.current_rsc_path", "");
+  LOG(WARNING) << "system rsc path:" << sys_rsc_overlay_path;
+  if (!sys_rsc_overlay_path.empty()) {
+    sys_rsc_overlay_path = sys_rsc_overlay_path + "/overlay";
+    if (stat(sys_rsc_overlay_path.c_str(), &st) == 0) {
+        input_dirs.push_back(sys_rsc_overlay_path);
+        LOG(WARNING) << "system rsc overlay path:" << sys_rsc_overlay_path;
+        }
+    }
+  // end
 
   if (input_dirs.empty()) {
     LOG(WARNING) << "no directories for idmap2 to scan";

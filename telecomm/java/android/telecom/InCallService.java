@@ -17,6 +17,7 @@
 package android.telecom;
 
 import android.annotation.NonNull;
+import android.annotation.ProductApi;
 import android.annotation.SdkConstant;
 import android.annotation.SystemApi;
 import android.app.Service;
@@ -644,6 +645,19 @@ public abstract class InCallService extends Service {
      * @param extras Any associated extras.
      */
     public void onConnectionEvent(Call call, String event, Bundle extras) {
+    }
+
+    /**
+     * Mediatek APIs related with call operations.
+     *
+     * @param params The bundle of operation parameters.
+     * @hide
+     */
+    @ProductApi
+    public final void doMtkAction(Bundle params) {
+        if (mPhone != null) {
+            mPhone.doMtkAction(params);
+        }
     }
 
     /**

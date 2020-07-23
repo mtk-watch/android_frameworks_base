@@ -1497,6 +1497,10 @@ class ActivityStack extends ConfigurationContainer {
         r.completeResumeLocked();
         if (DEBUG_SAVED_STATE) Slog.i(TAG_SAVED_STATE,
                 "Launch completed; removing icicle of " + r.icicle);
+
+        /// M: onAfterActivityResumed @{
+        mService.mAmsExt.onAfterActivityResumed(r);
+        /// M: onAfterActivityResumed @}
     }
 
     private void clearLaunchTime(ActivityRecord r) {
@@ -1714,7 +1718,10 @@ class ActivityStack extends ConfigurationContainer {
         // If we are not going to sleep, we want to ensure the device is
         // awake until the next activity is started.
         if (!uiSleeping && !mService.isSleepingOrShuttingDownLocked()) {
-            mStackSupervisor.acquireLaunchWakelock();
+            try{
+                mStackSupervisor.acquireLaunchWakelock();
+            }catch(IllegalStateException e){
+            }
         }
 
         if (mPausingActivity != null) {
@@ -2741,12 +2748,24 @@ class ActivityStack extends ConfigurationContainer {
         final boolean resumeWhilePausing = (next.info.flags & FLAG_RESUME_WHILE_PAUSING) != 0
                 && !lastResumedCanPip;
 
+        /// M: onBeforeActivitySwitch @{
+        ActivityRecord lastResumedBeforeActivitySwitch
+            = lastResumed != null ? lastResumed : mResumedActivity;
+        /// M: onBeforeActivitySwitch @}
+
         boolean pausing = getDisplay().pauseBackStacks(userLeaving, next, false);
         if (mResumedActivity != null) {
             if (DEBUG_STATES) Slog.d(TAG_STATES,
                     "resumeTopActivityLocked: Pausing " + mResumedActivity);
             pausing |= startPausingLocked(userLeaving, false, next, false);
         }
+
+        /// M: onBeforeActivitySwitch @{
+        mService.mAmsExt.onBeforeActivitySwitch(
+            lastResumedBeforeActivitySwitch, next, pausing,
+            next.getActivityType());
+        /// M: onBeforeActivitySwitch @}
+
         if (pausing && !resumeWhilePausing) {
             if (DEBUG_SWITCH || DEBUG_STATES) Slog.v(TAG_STATES,
                     "resumeTopActivityLocked: Skip resume: need to start pausing");
@@ -2904,6 +2923,10 @@ class ActivityStack extends ConfigurationContainer {
                     + " (in existing)");
 
             next.setState(RESUMED, "resumeTopActivityInnerLocked");
+
+            /// M: onAfterActivityResumed @{
+            mService.mAmsExt.onAfterActivityResumed(next);
+            /// M: onAfterActivityResumed @}
 
             next.app.updateProcessInfo(false /* updateServiceConnectionActivities */,
                     true /* activityChange */, true /* updateOomAdj */);
@@ -4027,6 +4050,19 @@ class ActivityStack extends ConfigurationContainer {
                     if (DEBUG_USER_LEAVING) Slog.v(TAG_USER_LEAVING,
                             "finish() => pause with userLeaving=false");
                     startPausingLocked(false, false, null, pauseImmediately);
+
+                    /// M: onBeforeActivitySwitch @{
+                    if (getDisplay() != null && getDisplay().getFocusedStack() != null) {
+                        ActivityRecord nextResumedActivity =
+                            getDisplay().getFocusedStack().topRunningActivityLocked();
+                        if (nextResumedActivity != null) {
+                            mService.mAmsExt.onBeforeActivitySwitch(
+                                    r,
+                                    nextResumedActivity, true,
+                                    nextResumedActivity.getActivityType());
+                        }
+                    }
+                    /// M: onBeforeActivitySwitch @}
                 }
 
                 if (endTask) {
@@ -4241,6 +4277,11 @@ class ActivityStack extends ConfigurationContainer {
 
     final boolean navigateUpToLocked(ActivityRecord srec, Intent destIntent, int resultCode,
             Intent resultData) {
+        if (!srec.attachedToProcess()) {
+            // Nothing to do if the caller is not attached, because this method should be called
+            // from an alive activity.
+            return false;
+        }
         final TaskRecord task = srec.getTaskRecord();
         final ArrayList<ActivityRecord> activities = task.mActivities;
         final int start = activities.indexOf(srec);
@@ -4294,14 +4335,14 @@ class ActivityStack extends ConfigurationContainer {
         }
 
         if (parent != null && foundParentInTask) {
+            final int callingUid = srec.info.applicationInfo.uid;
             final int parentLaunchMode = parent.info.launchMode;
             final int destIntentFlags = destIntent.getFlags();
             if (parentLaunchMode == ActivityInfo.LAUNCH_SINGLE_INSTANCE ||
                     parentLaunchMode == ActivityInfo.LAUNCH_SINGLE_TASK ||
                     parentLaunchMode == ActivityInfo.LAUNCH_SINGLE_TOP ||
                     (destIntentFlags & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0) {
-                parent.deliverNewIntentLocked(srec.info.applicationInfo.uid, destIntent,
-                        srec.packageName);
+                parent.deliverNewIntentLocked(callingUid, destIntent, srec.packageName);
             } else {
                 try {
                     ActivityInfo aInfo = AppGlobals.getPackageManager().getActivityInfo(
@@ -4314,10 +4355,10 @@ class ActivityStack extends ConfigurationContainer {
                             .setActivityInfo(aInfo)
                             .setResultTo(parent.appToken)
                             .setCallingPid(-1)
-                            .setCallingUid(parent.launchedFromUid)
-                            .setCallingPackage(parent.launchedFromPackage)
+                            .setCallingUid(callingUid)
+                            .setCallingPackage(srec.packageName)
                             .setRealCallingPid(-1)
-                            .setRealCallingUid(parent.launchedFromUid)
+                            .setRealCallingUid(callingUid)
                             .setComponentSpecified(true)
                             .execute();
                     foundParentInTask = res == ActivityManager.START_SUCCESS;

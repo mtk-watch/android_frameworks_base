@@ -66,8 +66,9 @@ import static android.system.OsConstants.ENODEV;
 @SuppressWarnings("deprecation")
 public class CameraDeviceUserShim implements ICameraDeviceUser {
     private static final String TAG = "CameraDeviceUserShim";
-
-    private static final boolean DEBUG = false;
+    //!++
+    private static final boolean DEBUG = ParameterUtils.DEBUG;
+    //!--
     private static final int OPEN_CAMERA_TIMEOUT_MS = 5000; // 5 sec (same as api1 cts timeout)
 
     private final LegacyCameraDevice mLegacyDevice;

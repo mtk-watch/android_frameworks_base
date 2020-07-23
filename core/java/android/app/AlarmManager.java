@@ -117,7 +117,16 @@ public class AlarmManager {
      * wakes up.
      */
     public static final int ELAPSED_REALTIME = 3;
-
+    /// M: added for powerOffAlarm feature @{
+    /**
+     * M: This alarm type is used to set an alarm that would be triggered if device
+     * is in powerOff state. It is set to trigger POWER_OFF_ALARM_BUFFER_TIME ms earlier
+     * than the actual alarm time so that phone is in wakeup state when actual alarm
+     * triggers
+     */
+    /** @hide */
+    public static final int PRE_SCHEDULE_POWER_OFF_ALARM = 7;
+    ///@}
     /**
      * Broadcast Action: Sent after the value returned by
      * {@link #getNextAlarmClock()} has changed.
@@ -1015,7 +1024,21 @@ public class AlarmManager {
             throw ex.rethrowFromSystemServer();
         }
     }
-
+    /// M: added for powerOffAlarm feature @{
+    /**
+     * For cancel the powerOffAlarm
+     * @return perform power off alarm function and return nothing
+     *@hide
+     *@internal
+     */
+    public void cancelPoweroffAlarm(String name) {
+        try {
+            mService.cancelPoweroffAlarm(name);
+        } catch (RemoteException ex) {
+                    Log.e(TAG, "Unable to cancel power off Alarm Manager!", ex);
+        }
+    }
+    ///@}
     /** @hide */
     public long getNextWakeFromIdleTime() {
         try {

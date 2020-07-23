@@ -148,6 +148,7 @@ import android.os.RecoverySystem;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.ServiceManager.ServiceNotFoundException;
+import android.os.SystemProperties;
 import android.os.SystemUpdateManager;
 import android.os.SystemVibrator;
 import android.os.UserHandle;
@@ -198,13 +199,23 @@ import com.android.internal.os.IDropBoxManagerService;
 import com.android.internal.policy.PhoneLayoutInflater;
 
 import java.util.Map;
+import dalvik.system.PathClassLoader;
+import java.lang.reflect.Method;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Manages all of the system services that can be returned by {@link Context#getSystemService}.
  * Used by {@link ContextImpl}.
+ * @hide
  */
-final class SystemServiceRegistry {
+public final class SystemServiceRegistry {
     private static final String TAG = "SystemServiceRegistry";
+
+    private static final String PERSISTENT_DATA_BLOCK_PROP = "ro.frp.pst";
+
+    /// M: This system property is set only if vendorlock is present on device
+    private static final String PERSISTENT_OEM_VENDOR_LOCK = "ro.service.oem.vendorlock";
 
     // Service registry information.
     // This information is never changed once static initialization has completed.
@@ -216,6 +227,9 @@ final class SystemServiceRegistry {
 
     // Not instantiable.
     private SystemServiceRegistry() { }
+
+    /// M: For mtk system service registry
+    public static Class<?> sMtkServiceRegistryClass;
 
     static {
         //CHECKSTYLE:OFF IndentationCheck
@@ -987,11 +1001,20 @@ final class SystemServiceRegistry {
                 return new JobSchedulerImpl(IJobScheduler.Stub.asInterface(b));
             }});
 
+        final boolean hasPdb =
+                !SystemProperties.get(PERSISTENT_DATA_BLOCK_PROP).equals("");
+
+        /// M: This system property is set only if vendorlock is present on device
+        final boolean hasOEMVendorLock =
+                !SystemProperties.get(PERSISTENT_OEM_VENDOR_LOCK).equals("");
+
+        if (hasPdb) {
         registerService(Context.PERSISTENT_DATA_BLOCK_SERVICE, PersistentDataBlockManager.class,
                 new StaticServiceFetcher<PersistentDataBlockManager>() {
             @Override
             public PersistentDataBlockManager createService() throws ServiceNotFoundException {
-                IBinder b = ServiceManager.getServiceOrThrow(Context.PERSISTENT_DATA_BLOCK_SERVICE);
+                    IBinder b =
+                        ServiceManager.getServiceOrThrow(Context.PERSISTENT_DATA_BLOCK_SERVICE);
                 IPersistentDataBlockService persistentDataBlockService =
                         IPersistentDataBlockService.Stub.asInterface(b);
                 if (persistentDataBlockService != null) {
@@ -1001,7 +1024,9 @@ final class SystemServiceRegistry {
                     return null;
                 }
             }});
+        }
 
+        if (hasPdb || hasOEMVendorLock) {
         registerService(Context.OEM_LOCK_SERVICE, OemLockManager.class,
                 new StaticServiceFetcher<OemLockManager>() {
             @Override
@@ -1015,6 +1040,7 @@ final class SystemServiceRegistry {
                     return null;
                 }
             }});
+        }
 
         registerService(Context.MEDIA_PROJECTION_SERVICE, MediaProjectionManager.class,
                 new CachedServiceFetcher<MediaProjectionManager>() {
@@ -1289,6 +1315,11 @@ final class SystemServiceRegistry {
                                 IDynamicSystemService.Stub.asInterface(b));
                     }});
         //CHECKSTYLE:ON IndentationCheck
+        /// M: Register mtk service@{
+        sMtkServiceRegistryClass = regMtkService();
+        setMtkSystemServiceName();
+        registerAllMtkService();
+        /// @}
     }
 
     /**
@@ -1327,7 +1358,7 @@ final class SystemServiceRegistry {
      * Base interface for classes that fetch services.
      * These objects must only be created during static initialization.
      */
-    static abstract interface ServiceFetcher<T> {
+    public static abstract interface ServiceFetcher<T> {
         T getService(ContextImpl ctx);
     }
 
@@ -1335,10 +1366,10 @@ final class SystemServiceRegistry {
      * Override this class when the system service constructor needs a
      * ContextImpl and should be cached and retained by that context.
      */
-    static abstract class CachedServiceFetcher<T> implements ServiceFetcher<T> {
+     public static abstract class CachedServiceFetcher<T> implements ServiceFetcher<T> {
         private final int mCacheIndex;
 
-        CachedServiceFetcher() {
+        public CachedServiceFetcher() {
             // Note this class must be instantiated only by the static initializer of the
             // outer class (SystemServiceRegistry), which already does the synchronization,
             // so bare access to sServiceCacheSize is okay here.
@@ -1488,4 +1519,46 @@ final class SystemServiceRegistry {
             Log.w(TAG, e.getMessage());
         }
     }
+
+    /// M: For mtk system service registry @{
+    private static Class<?> regMtkService() {
+        Log.i(TAG, "regMtkService start");
+        try {
+            String className = "mediatek.app.MtkSystemServiceRegistry";
+            String mtkSServerPackage = "system/framework/mediatek-framework.jar";
+            PathClassLoader mtkSsLoader = new PathClassLoader(mtkSServerPackage,
+                SystemServiceRegistry.class.getClassLoader());
+            return Class.forName(className, false, mtkSsLoader);
+        } catch (Exception e) {
+            Log.e(TAG, "regMtkService:" + e.toString());
+            return null;
+        }
+   }
+
+    private static void setMtkSystemServiceName() {
+        Log.i(TAG, "setMtkSystemServiceName start");
+        try {
+            if (sMtkServiceRegistryClass != null) {
+                Method method = sMtkServiceRegistryClass.getDeclaredMethod(
+                    "setMtkSystemServiceName", ArrayMap.class, ArrayMap.class);
+                method.invoke(sMtkServiceRegistryClass, SYSTEM_SERVICE_NAMES,
+                     SYSTEM_SERVICE_FETCHERS);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "setMtkSystemServiceName" +  e.toString());
+        }
+    }
+
+    private static void registerAllMtkService() {
+        Log.i(TAG, "registerAllMtkService start");
+        try {
+            if (sMtkServiceRegistryClass != null) {
+                Method method = sMtkServiceRegistryClass.getDeclaredMethod("registerAllService");
+                method.invoke(sMtkServiceRegistryClass);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "createMtkSystemServer" +  e.toString());
+        }
+    }
+    /// @}
 }

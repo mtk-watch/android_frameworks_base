@@ -19,6 +19,7 @@ package android.hardware;
 import static android.system.OsConstants.*;
 
 import android.annotation.Nullable;
+import android.annotation.ProductApi;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.UnsupportedAppUsage;
@@ -39,6 +40,9 @@ import android.os.Message;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+//!++
+import android.os.SystemProperties;
+//!--
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RSIllegalArgumentException;
@@ -54,6 +58,11 @@ import com.android.internal.app.IAppOpsCallback;
 import com.android.internal.app.IAppOpsService;
 
 import java.io.IOException;
+//!++
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
+//!--
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -1185,6 +1194,10 @@ public class Camera {
 
         @Override
         public void handleMessage(Message msg) {
+            //!++
+            // For debug
+            Log.i(TAG, "handleMessage: " + msg.what);
+            //!--
             switch(msg.what) {
             case CAMERA_MSG_SHUTTER:
                 if (mShutterCallback != null) {
@@ -1269,6 +1282,16 @@ public class Camera {
                     mAutoFocusMoveCallback.onAutoFocusMoving(msg.arg1 == 0 ? false : true, mCamera);
                 }
                 return;
+            //!++
+            //Add extension notify handle flow.
+            case MTK_CAMERA_MSG_EXT_NOTIFY:
+                handleExtNotify(msg, mCamera);
+                return;
+            //Add extension data handle flow.
+            case MTK_CAMERA_MSG_EXT_DATA:
+                handleExtData(msg, mCamera);
+                return;
+            //!--
 
             default:
                 Log.e(TAG, "Unknown message type " + msg.what);
@@ -2113,8 +2136,12 @@ public class Camera {
                         " while a preview allocation is configured.");
             }
         }
+        //!++
+        String s = params.flatten();
+        printParameter(s);
+        native_setParameters(s);
+        //!--
 
-        native_setParameters(params.flatten());
     }
 
     /**
@@ -2131,6 +2158,9 @@ public class Camera {
         Parameters p = new Parameters();
         String s = native_getParameters();
         p.unflatten(s);
+        //!++
+        printParameter(s);
+        //!--
         return p;
     }
 
@@ -2663,11 +2693,31 @@ public class Camera {
          * is the one that will take precedence.
          * </p>
          */
-        private final LinkedHashMap<String, String> mMap;
+        //!++
+        //Remove final keyword for copy().
+        private LinkedHashMap<String, String> mMap;
+        //!--
 
         private Parameters() {
-            mMap = new LinkedHashMap<String, String>(/*initialCapacity*/64);
+            //!++
+            //Extend 64 -> 128
+            mMap = new LinkedHashMap<String, String>(/*initialCapacity*/128);
+            //!--
         }
+
+        //!++
+        /**
+         * Clone parameter from current settings.
+         * @hide
+         * @return the clone parameter
+         */
+        @ProductApi
+        public Parameters copy() {
+            Parameters para = new Parameters();
+            para.mMap = new LinkedHashMap<String, String>(mMap);
+            return para;
+        }
+        //!--
 
         /**
          * Overwrite existing parameters with a copy of the ones from {@code other}.
@@ -4497,4 +4547,601 @@ public class Camera {
             return false;
         }
     };
+
+    //!++
+    private static final int MTK_CAMERA_MSG_EXT_NOTIFY   = 0x40000000;  //  extended notify message
+    private static final int MTK_CAMERA_MSG_EXT_DATA     = 0x20000000;  //  extended data message
+
+
+    // Extended data message (MTK_CAMERA_MSG_EXT_DATA)
+    // These match the enums in mediatek/frameworks-ext/av/include/camera/MtkCamera.h
+    //
+    // Auto Panorama
+    //  int[0]: 0:mAutoRamaMoveCallback, 1:mAutoRamaCallback
+    //  int[1~]:depends on
+    private static final int MTK_CAMERA_MSG_EXT_DATA_AUTORAMA           = 0x00000001;
+    // AF Window Results
+    private static final int MTK_CAMERA_MSG_EXT_DATA_AF                 = 0x00000002;
+    // FB
+    private static final int MTK_CAMERA_MSG_EXT_DATA_FACEBEAUTY         = 0x00000006;
+    //Stereo Camera JPS
+    private static final int MTK_CAMERA_MSG_EXT_DATA_JPS                = 0x00000011;
+    //Stereo Debug Data
+    //int[0]: data type.
+    private static final int MTK_CAMERA_MSG_EXT_DATA_STEREO_DBG         = 0x00000012;
+    //Stereo Camera Depth Map Data
+    private static final int MTK_CAMERA_MSG_EXT_DATA_STEREO_DEPTHMAP    = 0x00000014;
+    //Stereo Camera Clear Data
+    private static final int MTK_CAMERA_MSG_EXT_DATA_STEREO_CLEAR_IMAGE = 0x00000015;
+    //Stereo Camera LDC Data
+    private static final int MTK_CAMERA_MSG_EXT_DATA_STEREO_LDC         = 0x00000016;
+    //Stereo Camera n3d Data
+    private static final int MTK_CAMERA_MSG_EXT_DATA_STEREO_N3D         = 0x00000019;
+    //Stereo Camera Depth wrapper
+    private static final int MTK_CAMERA_MSG_EXT_DATA_STEREO_DEPTHWRAPPER = 0x00000020;
+
+    // Extended notify message (MTK_CAMERA_MSG_EXT_NOTIFY)
+    // These match the enums in mediatek/frameworks-ext/av/include/camera/MtkCamera.h
+    //
+    // Auto Scene Detection
+    private static final int MTK_CAMERA_MSG_EXT_NOTIFY_ASD              = 0x00000002;
+    // End notify for Continuous shot
+    private static final int MTK_CAMERA_MSG_EXT_NOTIFY_CONTINUOUS_END   = 0x00000006;
+    // Stereo Feature: warning message
+    private static final int MTK_CAMERA_MSG_EXT_NOTIFY_STEREO_WARNING  = 0x00000014;
+    // Stereo Feature: distance value
+    private static final int MTK_CAMERA_MSG_EXT_NOTIFY_STEREO_DISTANCE = 0x00000015;
+    // notify for Image before compress when taking capture
+    private static final int MTK_CAMERA_MSG_EXT_NOTIFY_IMAGE_UNCOMPRESSED = 0x00000017;
+
+    //auto panorama
+    private AutoRamaCallback mAutoRamaCallback;
+    private AutoRamaMoveCallback mAutoRamaMoveCallback;
+    private VendorDataCallback mVendorDataCallback;
+    //FB
+    private Camera.FbOriginalCallback mFbOriginalCallback;
+    // ASD
+    private Camera.AsdCallback mAsdCallback;
+    // AF Data
+    private Camera.AFDataCallback mAFDataCallback;
+    // Continuous shot done
+    private ContinuousShotCallback mCSDoneCallback;
+    //Stereo Camera Data
+    private Camera.StereoCameraDataCallback mStereoCameraDataCallback;
+    private Camera.StereoCameraWarningCallback mStereoCameraWarningCallback;
+    private Camera.DistanceInfoCallback mDistanceInfoCallback;
+    //A callback before image compressing,
+    //Notify that AP can take picture
+    private PictureCallback mUncompressedImageCallback;
+
+
+    /**
+     * @hide
+     * Vendor data callback interface used to supply
+     * vendor-defined data from a camera native.
+     */
+    public interface VendorDataCallback {
+        /**
+         * Called when vendor-defined data is available.
+         *
+         * @param message message object from native.
+         */
+        void onDataCallback(Message message);
+    }
+
+    // auto panorama
+    /**
+      * @hide
+      * An interface which contains a callback for the auto panorama
+      */
+    public interface AutoRamaCallback {
+        /**
+          * @param jpegData the captured jpegdata
+          */
+        void onCapture(byte[] jpegData);
+
+    }
+
+   /**
+     * @hide
+     * An interface which contains a callback for the auto panorama movtion vector
+     */
+    public interface AutoRamaMoveCallback {
+        /**
+         * @param xx the pointer
+         * @param yy direction
+         */
+        void onFrame(int xx, int yy);
+    }
+
+    /**
+     * @hide
+     * An interface which contains a callback for the continuous shot
+     */
+    public interface ContinuousShotCallback {
+      /**
+        * @param capNum capture number
+        */
+        public void onConinuousShotDone(int capNum);
+    }
+
+    /**
+     * @hide
+     * Set vendor data callback to receive vendor data.
+     *
+     * @param callback The callback instance.
+     */
+    public void setVendorDataCallback(VendorDataCallback callback) {
+        mVendorDataCallback = callback;
+    }
+
+    /**
+     * @hide
+     *
+     * Registers a callback to be invoked when a image for autorama is taken
+     * @param cb the callback to run
+     */
+    @ProductApi
+    public final void setAutoRamaCallback(AutoRamaCallback cb) {
+        mAutoRamaCallback = cb;
+    }
+
+    /**
+     * @hide
+     *
+     * Registers a callback to be invoked when the motion vector is calculated
+     * @param cb the callback to run
+     */
+    @ProductApi
+    public final void setAutoRamaMoveCallback(AutoRamaMoveCallback cb) {
+        mAutoRamaMoveCallback = cb;
+    }
+
+    /**
+     * @hide
+     *
+     * Start to capture number of images of panorama.
+     * @param num number of images
+     */
+     @ProductApi
+     public final void startAutoRama(int num) {
+         startAUTORAMA(num);
+     }
+
+     /**
+      * @hide
+      * Registers a callback to be invoked when continuous shot is done
+      * @param callback ContinuousShotCallback
+      */
+     @ProductApi
+     public void setContinuousShotCallback(ContinuousShotCallback callback) {
+         mCSDoneCallback = callback;
+     }
+
+     /**
+     * @hide
+     *
+     * Stop auto panorama
+     * @param isMerge if isMerge is 1, there will be an autorama callback when merge is done
+     */
+     @ProductApi
+     public void stopAutoRama(int isMerge) {
+         stopAUTORAMA(isMerge);
+     }
+
+     /**
+      * @hide
+      *
+      * Cancel continuous shot
+      */
+     @ProductApi
+     public native void cancelContinuousShot();
+
+     /**
+      * @hide
+      * @param speed : the speed set for continuous shot
+      * set speed of continuous shot(xx fps)
+      */
+     @ProductApi
+     public native void setContinuousShotSpeed(int speed);
+
+    //ASD
+    /**
+     * @hide An interface which contains a callback for the auto scene detection
+     */
+    public interface AsdCallback {
+        /**
+         * @param scene the scene detected
+         */
+        void onDetected(int scene);
+    }
+
+    /**
+     * @param cb the callback to run
+     * @hide Registers a callback to be invoked when auto scene is detected
+     */
+    @ProductApi
+    public final void setAsdCallback(AsdCallback cb) {
+        mAsdCallback = cb;
+    }
+
+    /**
+     * Callback interface used to deliver focus data.
+     * *
+     *
+     * @hide
+     */
+    public interface AFDataCallback {
+        void onAFData(byte[] data, Camera camera);
+    }
+
+    /**
+     * @param cb the callback to run
+     * @hide Registers a callback to be invoked when in focus
+     */
+    @ProductApi
+    public final void setAFDataCallback(AFDataCallback cb) {
+        mAFDataCallback = cb;
+    }
+
+    /**
+     * @hide An interface which contains a callback for FB origin image
+     */
+    public interface FbOriginalCallback {
+        /**
+         * @param originJpegData capture data
+         */
+        void onCapture(byte[] originJpegData);
+    }
+
+    /**
+     * @param cb the callback to run
+     * @hide Registers a callback to be invoke when HDR origin image is taken
+     */
+    @ProductApi
+    public final void setFbOriginalCallback(FbOriginalCallback cb) {
+        mFbOriginalCallback = cb;
+    }
+
+    /**
+     * @hide An interface which contains a callback for stere Camera Distance Info
+     */
+    public interface DistanceInfoCallback {
+        /**
+         * @param info distance info
+         */
+        void onInfo(String info);
+    }
+
+    /**
+     * @param cb the callback to run
+     * @hide Registers a callback to be invoke when Distance info is taken
+     */
+    @ProductApi
+    public final void setDistanceInfoCallback(DistanceInfoCallback cb) {
+        mDistanceInfoCallback = cb;
+    }
+
+    /**
+     * @hide An interface which contains a callback for stere Camera JPS and Mask image
+     * Depth map and clear image.
+     */
+    public interface StereoCameraDataCallback {
+        /**
+         * @param jps capture data
+         */
+        void onJpsCapture(byte[] jpsData);
+
+        /**
+         * @param mask capture data
+         */
+        void onMaskCapture(byte[] maskData);
+
+        /**
+         * @param depth map capture data
+         */
+        void onDepthMapCapture(byte[] depthMapData);
+
+        /**
+         * @param clear image capture data
+         */
+        void onClearImageCapture(byte[] clearImageData);
+
+        /**
+         * @param ldc capture data
+         */
+        void onLdcCapture(byte[] ldcData);
+
+        /**
+         * @param n3d debug data
+         */
+        void onN3dCapture(byte[] n3dData);
+
+        /**
+         * @param depth wrapper
+         */
+        void onDepthWrapperCapture(byte[] depthWrapper);
+    }
+
+    /**
+     * @param cb the callback to run
+     * @hide Registers a callback to be invoke when Stereo Camera JPS image is taken
+     */
+    @ProductApi
+    public final void setStereoCameraDataCallback(StereoCameraDataCallback cb) {
+        mStereoCameraDataCallback = cb;
+    }
+
+    /**
+     * @hide An interface which contains a callback for stere Camera Warning Message
+     */
+    public interface StereoCameraWarningCallback {
+        /**
+         * @param type warning type
+         */
+        void onWarning(int type);
+    }
+
+    /**
+     * @param cb the callback to run
+     * @hide Registers a callback to be invoke when Stereo Camera warning is taken
+     */
+    @ProductApi
+    public final void setStereoCameraWarningCallback(StereoCameraWarningCallback cb) {
+        mStereoCameraWarningCallback = cb;
+    }
+
+
+    /**
+     * @hide
+     * Registers a callback to be invoke when uncompressed image is taken
+     * @param cb the callback to run
+     */
+    public final void setUncompressedImageCallback(PictureCallback cb) {
+        mUncompressedImageCallback = cb;
+    }
+
+    private void handleExtNotify(Message msg, Camera camera) {
+        switch (msg.arg1) {
+        case MTK_CAMERA_MSG_EXT_NOTIFY_ASD:
+            if (mAsdCallback != null) {
+                mAsdCallback.onDetected(msg.arg2);
+                return;
+            }
+            break;
+        case MTK_CAMERA_MSG_EXT_NOTIFY_CONTINUOUS_END:
+            if (mCSDoneCallback != null) {
+                mCSDoneCallback.onConinuousShotDone(msg.arg2);
+                return;
+            }
+            break;
+        case MTK_CAMERA_MSG_EXT_NOTIFY_STEREO_WARNING:
+            if (mStereoCameraWarningCallback != null) {
+                int message = msg.arg2;
+                // There are three warning messages info in arg2 with int32 type
+                //            bit0:large lv diff;
+                //            bit1:low light;
+                //            bit2:close shot
+                // we need to decode the message types
+                int[] type = new int[3];
+                int warnType = -1;
+                for (int i = 0; i < 3; i++) {
+                    type[i] = (int) message & 1;
+                    message = message >> 1;
+                }
+                // we need to notify user by order bit0-->bit2-->bit1
+                if (type[0] == 1) {
+                    warnType = 0;
+                } else if (type[2] == 1) {
+                    warnType = 2;
+                } else if (type[1] == 1) {
+                    warnType = 1;
+                } else {
+                    warnType = 3;
+                }
+                if (warnType != -1) {
+                    mStereoCameraWarningCallback.onWarning(warnType);
+                }
+                return;
+            }
+            break;
+        case MTK_CAMERA_MSG_EXT_NOTIFY_STEREO_DISTANCE:
+            if (mDistanceInfoCallback != null) {
+                String info = String.valueOf(msg.arg2);
+                if (info != null) {
+                    mDistanceInfoCallback.onInfo(info);
+                }
+                return;
+            }
+            break;
+        case MTK_CAMERA_MSG_EXT_NOTIFY_IMAGE_UNCOMPRESSED:
+            if (mUncompressedImageCallback != null) {
+                mUncompressedImageCallback.onPictureTaken(null, camera);
+                return;
+            }
+            break;
+        default:
+            Log.e(TAG, "Unknown MTK-extended notify message type " + msg.arg1);
+            break;
+        }
+        if (mVendorDataCallback != null) {
+            mVendorDataCallback.onDataCallback(msg);
+        }
+    }
+
+    private void handleExtData(Message msg, Camera camera) {
+        switch (msg.arg1) {
+        case MTK_CAMERA_MSG_EXT_DATA_AUTORAMA: {
+
+            byte[] byteArray = (byte[]) msg.obj;
+            byte[] byteHead = new byte[16];
+            System.arraycopy(byteArray, 0, byteHead, 0, 16);
+
+            IntBuffer intBuf = ByteBuffer.wrap(byteHead)
+                    .order(ByteOrder.nativeOrder()).asIntBuffer();
+            if (0 == intBuf.get(0)) {
+                if (mAutoRamaMoveCallback != null) {
+                    int x   = intBuf.get(1);
+                    int y   = intBuf.get(2);
+                    int dir = intBuf.get(3);
+                    int xy  = ((0x0000FFFF & x) << 16) + (0x0000FFFF & y);
+                    mAutoRamaMoveCallback.onFrame(xy, dir);
+                    return;
+                }
+            } else {
+                if (mAutoRamaCallback != null) {
+                    if (1 == intBuf.get(0)) {
+                        mAutoRamaCallback.onCapture(null);
+                    } else if (2 == intBuf.get(0)) {
+                        byte[] jpegData = new byte[byteArray.length - 4];
+                        System.arraycopy(byteArray, 4, jpegData, 0,
+                                                byteArray.length - 4);
+                        mAutoRamaCallback.onCapture(jpegData);
+                    }
+                    return;
+                }
+            }
+            byteHead = null;
+        }
+        break;
+        case MTK_CAMERA_MSG_EXT_DATA_AF: {
+            if (mAFDataCallback != null) {
+                AFDataCallback afDatacb = mAFDataCallback;
+                afDatacb.onAFData((byte[]) msg.obj, camera);
+                return;
+            }
+        }
+        break;
+        case MTK_CAMERA_MSG_EXT_DATA_FACEBEAUTY:
+            if (mFbOriginalCallback != null) {
+                byte[] byteArray = ((byte[]) msg.obj);
+                byte[] jpegData = new byte[byteArray.length - 4];
+                System.arraycopy(byteArray, 4, jpegData, 0, byteArray.length - 4);
+                // becuase current msg =6 have change to FB callback
+                if (SystemProperties.getInt("ro.mtk_cam_vfb", 0) == 1
+                        && mJpegCallback != null) {
+                    mJpegCallback.onPictureTaken(jpegData, camera);
+                } else {
+                    mFbOriginalCallback.onCapture(jpegData);
+                }
+                return;
+            }
+        break;
+        case MTK_CAMERA_MSG_EXT_DATA_JPS:
+            if (mStereoCameraDataCallback != null) {
+                byte[] byteArray = ((byte[]) msg.obj);
+                byte[] jpegData = new byte[byteArray.length - 4];
+                System.arraycopy(byteArray, 4, jpegData, 0, byteArray.length - 4);
+                mStereoCameraDataCallback.onJpsCapture(jpegData);
+                return;
+            }
+        break;
+        case MTK_CAMERA_MSG_EXT_DATA_STEREO_DBG:
+            if (mStereoCameraDataCallback != null) {
+                byte[] byteArray = ((byte[]) msg.obj);
+                byte[] jpegData = new byte[byteArray.length - 4];
+                System.arraycopy(byteArray, 4, jpegData, 0, byteArray.length - 4);
+                mStereoCameraDataCallback.onMaskCapture(jpegData);
+                return;
+            }
+        break;
+        case MTK_CAMERA_MSG_EXT_DATA_STEREO_DEPTHMAP:
+            if (mStereoCameraDataCallback != null) {
+                byte[] byteArray = ((byte[]) msg.obj);
+                byte[] jpegData = new byte[byteArray.length - 4];
+                System.arraycopy(byteArray, 4, jpegData, 0, byteArray.length - 4);
+                mStereoCameraDataCallback.onDepthMapCapture(jpegData);
+                return;
+            }
+        break;
+        case MTK_CAMERA_MSG_EXT_DATA_STEREO_CLEAR_IMAGE:
+            if (mStereoCameraDataCallback != null) {
+                byte[] byteArray = ((byte[]) msg.obj);
+                byte[] jpegData = new byte[byteArray.length - 4];
+                System.arraycopy(byteArray, 4, jpegData, 0, byteArray.length - 4);
+                mStereoCameraDataCallback.onClearImageCapture(jpegData);
+                return;
+            }
+        break;
+        case MTK_CAMERA_MSG_EXT_DATA_STEREO_LDC:
+            if (mStereoCameraDataCallback != null) {
+                byte[] byteArray = ((byte[]) msg.obj);
+                byte[] jpegData = new byte[byteArray.length - 4];
+                System.arraycopy(byteArray, 4, jpegData, 0, byteArray.length - 4);
+                mStereoCameraDataCallback.onLdcCapture(jpegData);
+                return;
+            }
+        break;
+        case MTK_CAMERA_MSG_EXT_DATA_STEREO_N3D:
+            if (mStereoCameraDataCallback != null) {
+                byte[] byteArray = ((byte[]) msg.obj);
+                byte[] jpegData = new byte[byteArray.length - 4];
+                System.arraycopy(byteArray, 4, jpegData, 0, byteArray.length - 4);
+                mStereoCameraDataCallback.onN3dCapture(jpegData);
+                return;
+            }
+        break;
+        case MTK_CAMERA_MSG_EXT_DATA_STEREO_DEPTHWRAPPER:
+            if (mStereoCameraDataCallback != null) {
+                byte[] byteArray = ((byte[]) msg.obj);
+                byte[] jpegData = new byte[byteArray.length - 4];
+                System.arraycopy(byteArray, 4, jpegData, 0, byteArray.length - 4);
+                mStereoCameraDataCallback.onDepthWrapperCapture(jpegData);
+                return;
+            }
+        break;
+        default:
+            Log.e(TAG, "Unknown MTK-extended data message type " + msg.arg1);
+            break;
+        }
+        if (mVendorDataCallback != null) {
+            mVendorDataCallback.onDataCallback(msg);
+        }
+    }
+
+    private native static String native_getProperty(String key, String def);
+    private native static void native_setProperty(String key, String val);
+
+    /**
+     * @hide
+     * Get the value for the given key.
+     * @param key the key known
+     * @param def the default value
+     * @return if the key isn't found, return def if it isn't null, or an empty string otherwise
+     */
+    public static String getProperty(String key, String def) {
+        return native_getProperty(key, def);
+    }
+
+    /**
+     * @hide
+     * Set the value for the given key.
+     * @param key the given key to set
+     * @param val the value set to the key
+     */
+    public static void setProperty(String key, String val) {
+        native_setProperty(key, val);
+    }
+
+    private native final void startAUTORAMA(int num);
+    private native void stopAUTORAMA(int isMerge);
+
+    private void printParameter(String parameters) {
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            int maxLength = 1000;
+            long length = parameters.length();
+            if (length <= maxLength) {
+                Log.d(TAG, parameters);
+            } else {
+                for (int i = 0; i < parameters.length(); i += maxLength) {
+                    if (i + maxLength < parameters.length()) {
+                        Log.d(TAG, parameters.substring(i, i + maxLength));
+                    } else {
+                        Log.d(TAG, parameters.substring(i, parameters.length()));
+                    }
+                }
+            }
+        }
+    }
+    //!--
 }

@@ -42,6 +42,7 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.UserHandle;
+import android.os.Build;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.Display;
@@ -68,7 +69,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @SystemService(Context.MEDIA_ROUTER_SERVICE)
 public class MediaRouter {
     private static final String TAG = "MediaRouter";
-    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
+    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG)
+                                         || !"user".equals(Build.TYPE);
 
     static class Static implements DisplayManager.DisplayListener {
         final String mPackageName;
@@ -1307,6 +1309,9 @@ public class MediaRouter {
     }
 
     static void dispatchRouteSelected(int type, RouteInfo info) {
+        if (DEBUG) {
+            Log.d(TAG, "dispatchRouteSelected info: " + info + " type: " + type);
+        }
         for (CallbackInfo cbi : sStatic.mCallbacks) {
             if (cbi.filterRouteEvent(info)) {
                 cbi.cb.onRouteSelected(cbi.router, type, info);
@@ -1315,6 +1320,9 @@ public class MediaRouter {
     }
 
     static void dispatchRouteUnselected(int type, RouteInfo info) {
+        if (DEBUG) {
+            Log.d(TAG, "dispatchRouteUnselected info: " + info + " type: " + type);
+        }
         for (CallbackInfo cbi : sStatic.mCallbacks) {
             if (cbi.filterRouteEvent(info)) {
                 cbi.cb.onRouteUnselected(cbi.router, type, info);
@@ -1339,6 +1347,10 @@ public class MediaRouter {
             // applications.
             final boolean oldVisibility = cbi.filterRouteEvent(oldSupportedTypes);
             final boolean newVisibility = cbi.filterRouteEvent(newSupportedTypes);
+            if (DEBUG) {
+                Log.d(TAG, "dispatchRouteChanged oldVisibility: " + oldVisibility
+                        + "newVisibility: " + newVisibility);
+            }
             if (!oldVisibility && newVisibility) {
                 cbi.cb.onRouteAdded(cbi.router, info);
                 if (info.isSelected()) {
@@ -1425,6 +1437,10 @@ public class MediaRouter {
     }
 
     static void updateWifiDisplayStatus(WifiDisplayStatus status) {
+        if (DEBUG) {
+            Log.d(TAG, "updateWifiDisplayStatus status: " + status);
+        }
+
         WifiDisplay[] displays;
         WifiDisplay activeDisplay;
         if (status.getFeatureState() == WifiDisplayStatus.FEATURE_STATE_ON) {
@@ -1452,6 +1468,9 @@ public class MediaRouter {
         // Add or update routes.
         for (int i = 0; i < displays.length; i++) {
             final WifiDisplay d = displays[i];
+            if (DEBUG) {
+                Log.d(TAG, "updateWifiDisplayStatus display: " + d);
+            }
             if (shouldShowWifiDisplay(d, activeDisplay)) {
                 RouteInfo route = findWifiDisplayRoute(d);
                 if (route == null) {
@@ -1553,6 +1572,11 @@ public class MediaRouter {
         boolean enabled = isWifiDisplayEnabled(display, wfdStatus);
         changed |= route.mEnabled != enabled;
         route.mEnabled = enabled;
+
+        if (DEBUG) {
+            Log.d(TAG, "updateWifiDisplayRoute changed: " + changed + " enabled: " + enabled
+                    + "  route.isSelected(): " + route.isSelected() + " route: " + route);
+        }
 
         changed |= route.setRealStatusCode(getWifiDisplayStatusCode(display, wfdStatus));
 
@@ -2079,7 +2103,7 @@ public class MediaRouter {
                 if (mDeviceAddress != null) {
                     for (Display display : displays) {
                         if (display.getType() == Display.TYPE_WIFI
-                                && mDeviceAddress.equals(display.getAddress())) {
+                                && mDeviceAddress.equals(display.getAddress().toString())) {
                             return display;
                         }
                     }

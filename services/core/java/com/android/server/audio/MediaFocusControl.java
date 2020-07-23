@@ -53,7 +53,8 @@ import java.util.Stack;
 public class MediaFocusControl implements PlayerFocusEnforcer {
 
     private static final String TAG = "MediaFocusControl";
-    static final boolean DEBUG = false;
+    static final boolean DEBUG = "eng".equals(Build.TYPE)
+        || "userdebug".equals(Build.TYPE);
 
     /**
      * set to true so the framework enforces ducking itself, without communicating to apps

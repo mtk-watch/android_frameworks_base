@@ -27,11 +27,15 @@ import android.os.Trace;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
+/// M: Dcf Decoder Plugin
+import com.mediatek.dcfDecoder.MTKDcfDecoderFactory;
+import com.mediatek.dcfDecoder.MTKDcfDecoderManager;
 
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+
 
 /**
  * Creates Bitmap objects from various sources, including files, streams,
@@ -39,6 +43,10 @@ import java.io.InputStream;
  */
 public class BitmapFactory {
     private static final int DECODE_BUFFER_SIZE = 16 * 1024;
+
+     /// M: DcfDecoder Plugin Mechanism
+    private static MTKDcfDecoderManager sMTKDcfDecoderManager =
+            MTKDcfDecoderFactory.getInstance().makeMTKDcfDecoderManager();
 
     public static class Options {
         /**
@@ -48,7 +56,27 @@ public class BitmapFactory {
         public Options() {
             inScaled = true;
             inPremultiplied = true;
+            /* MTK_IMAGE_ENABLE_PQ_FOR_JPEG */
+            inPostProc = false;
+            inPostProcFlag = 0;
+            /* MTK_IMAGE_ENABLE_PQ_FOR_JPEG */
         }
+        /* MTK_IMAGE_ENABLE_PQ_FOR_JPEG */
+        /**
+         * Request for post process, if true, decoded image will be post processed
+         * to enhance sharpness and color.
+         * @hide
+         * @internal
+         */
+        public boolean inPostProc;
+
+        /**
+         * Post process flag , 0 means applying post process on opaque images only ,
+         * 1 means apply to all.
+         * @hide
+         */
+        public int inPostProcFlag;
+        /* MTK_IMAGE_ENABLE_PQ_FOR_JPEG */
 
         /**
          * If set, decode methods that take the Options object will attempt to
@@ -674,6 +702,12 @@ public class BitmapFactory {
             Trace.traceEnd(Trace.TRACE_TAG_GRAPHICS);
         }
 
+        /// M: Add for OMA DRM v1.0, when failed to get bitmap, try decode as drm format. need
+        /// check the data whether drm encrypt data to avoid dead loop because DcfDecoder will
+        /// call this method to decode clear data.
+        if (bm == null) {
+            bm = sMTKDcfDecoderManager.decodeDrmImageIfNeededImpl(data, opts);
+        }
         return bm;
     }
 
@@ -787,9 +821,14 @@ public class BitmapFactory {
         byte [] tempStorage = null;
         if (opts != null) tempStorage = opts.inTempStorage;
         if (tempStorage == null) tempStorage = new byte[DECODE_BUFFER_SIZE];
-        return nativeDecodeStream(is, tempStorage, outPadding, opts,
+        Bitmap bm = nativeDecodeStream(is, tempStorage, outPadding, opts,
                 Options.nativeInBitmap(opts),
                 Options.nativeColorSpace(opts));
+        /// M: Add for OMA DRM v1.0, when failed to get bitmap, try decode as drm format.
+        if (bm == null) {
+            bm = sMTKDcfDecoderManager.decodeDrmImageIfNeededImpl(tempStorage, is, opts);
+        }
+        return bm;
     }
 
     /**
@@ -853,6 +892,10 @@ public class BitmapFactory {
             setDensityFromOptions(bm, opts);
         } finally {
             Trace.traceEnd(Trace.TRACE_TAG_GRAPHICS);
+        }
+        /// M: Add for OMA DRM v1.0, when failed to get bitmap, try decode as drm format.
+        if (bm == null) {
+            bm = sMTKDcfDecoderManager.decodeDrmImageIfNeededImpl(fd, opts);
         }
         return bm;
     }

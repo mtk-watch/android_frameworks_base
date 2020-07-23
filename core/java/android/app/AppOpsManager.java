@@ -53,6 +53,9 @@ import com.android.internal.app.IAppOpsService;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.Preconditions;
 
+import com.mediatek.cta.CtaManager;
+import com.mediatek.cta.CtaManagerFactory;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -834,9 +837,12 @@ public class AppOpsManager {
     public static final int OP_ACCESS_ACCESSIBILITY = 88;
     /** @hide Read the device identifiers (IMEI / MEID, IMSI, SIM / Build serial) */
     public static final int OP_READ_DEVICE_IDENTIFIERS = 89;
+    /** @hide Read location metadata from media */
+    public static final int OP_ACCESS_MEDIA_LOCATION = 90;
+
     /** @hide */
     @UnsupportedAppUsage
-    public static final int _NUM_OP = 90;
+    public static final int _NUM_OP = 91;
 
     /** Access to coarse location information. */
     public static final String OPSTR_COARSE_LOCATION = "android:coarse_location";
@@ -1107,6 +1113,9 @@ public class AppOpsManager {
     @TestApi
     @SystemApi
     public static final String OPSTR_LEGACY_STORAGE = "android:legacy_storage";
+    /** @hide Read location metadata from media */
+    public static final String OPSTR_ACCESS_MEDIA_LOCATION = "android:access_media_location";
+
     /** @hide Interact with accessibility. */
     @SystemApi
     public static final String OPSTR_ACCESS_ACCESSIBILITY = "android:access_accessibility";
@@ -1134,6 +1143,7 @@ public class AppOpsManager {
             // Storage
             OP_READ_EXTERNAL_STORAGE,
             OP_WRITE_EXTERNAL_STORAGE,
+            OP_ACCESS_MEDIA_LOCATION,
             // Location
             OP_COARSE_LOCATION,
             OP_FINE_LOCATION,
@@ -1273,6 +1283,7 @@ public class AppOpsManager {
             OP_LEGACY_STORAGE,                  // LEGACY_STORAGE
             OP_ACCESS_ACCESSIBILITY,            // ACCESS_ACCESSIBILITY
             OP_READ_DEVICE_IDENTIFIERS,         // READ_DEVICE_IDENTIFIERS
+            OP_ACCESS_MEDIA_LOCATION,           // ACCESS_MEDIA_LOCATION
     };
 
     /**
@@ -1369,6 +1380,7 @@ public class AppOpsManager {
             OPSTR_LEGACY_STORAGE,
             OPSTR_ACCESS_ACCESSIBILITY,
             OPSTR_READ_DEVICE_IDENTIFIERS,
+            OPSTR_ACCESS_MEDIA_LOCATION,
     };
 
     /**
@@ -1466,6 +1478,7 @@ public class AppOpsManager {
             "LEGACY_STORAGE",
             "ACCESS_ACCESSIBILITY",
             "READ_DEVICE_IDENTIFIERS",
+            "ACCESS_MEDIA_LOCATION",
     };
 
     /**
@@ -1564,6 +1577,7 @@ public class AppOpsManager {
             null, // no permission for OP_LEGACY_STORAGE
             null, // no permission for OP_ACCESS_ACCESSIBILITY
             null, // no direct permission for OP_READ_DEVICE_IDENTIFIERS
+            Manifest.permission.ACCESS_MEDIA_LOCATION,
     };
 
     /**
@@ -1662,6 +1676,7 @@ public class AppOpsManager {
             null, // LEGACY_STORAGE
             null, // ACCESS_ACCESSIBILITY
             null, // READ_DEVICE_IDENTIFIERS
+            null, // ACCESS_MEDIA_LOCATION
     };
 
     /**
@@ -1759,6 +1774,7 @@ public class AppOpsManager {
             false, // LEGACY_STORAGE
             false, // ACCESS_ACCESSIBILITY
             false, // READ_DEVICE_IDENTIFIERS
+            false, // ACCESS_MEDIA_LOCATION
     };
 
     /**
@@ -1855,6 +1871,7 @@ public class AppOpsManager {
             AppOpsManager.MODE_DEFAULT, // LEGACY_STORAGE
             AppOpsManager.MODE_ALLOWED, // ACCESS_ACCESSIBILITY
             AppOpsManager.MODE_ERRORED, // READ_DEVICE_IDENTIFIERS
+            AppOpsManager.MODE_ALLOWED, // ALLOW_MEDIA_LOCATION
     };
 
     /**
@@ -1955,6 +1972,7 @@ public class AppOpsManager {
             false, // LEGACY_STORAGE
             false, // ACCESS_ACCESSIBILITY
             false, // READ_DEVICE_IDENTIFIERS
+            false, // ACCESS_MEDIA_LOCATION
     };
 
     /**
@@ -2027,6 +2045,11 @@ public class AppOpsManager {
      */
     @UnsupportedAppUsage
     public static int opToSwitch(int op) {
+        /// M: CTA requirement - permission control  @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager().opToSwitch(op);
+        }
+        //@}
         return sOpToSwitch[op];
     }
 
@@ -2036,6 +2059,11 @@ public class AppOpsManager {
      */
     @UnsupportedAppUsage
     public static String opToName(int op) {
+        /// M: CTA requirement - permission control  @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager().opToName(op);
+        }
+        //@}
         if (op == OP_NONE) return "NONE";
         return op < sOpNames.length ? sOpNames[op] : ("Unknown(" + op + ")");
     }
@@ -2046,6 +2074,11 @@ public class AppOpsManager {
      * @hide
      */
     public static @NonNull String opToPublicName(int op) {
+        /// M: CTA requirement - permission control  @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager().opToPublicName(op);
+        }
+        //@}
         return sOpToString[op];
     }
 
@@ -2053,6 +2086,11 @@ public class AppOpsManager {
      * @hide
      */
     public static int strDebugOpToOp(String op) {
+        /// M: CTA requirement - permission control  @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager().strDebugOpToOp(op);
+        }
+        //@}
         for (int i=0; i<sOpNames.length; i++) {
             if (sOpNames[i].equals(op)) {
                 return i;
@@ -2067,6 +2105,11 @@ public class AppOpsManager {
      */
     @TestApi
     public static String opToPermission(int op) {
+        /// M: CTA requirement - permission control  @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager().opToPermission(op);
+        }
+        //@}
         return sOpPerms[op];
     }
 
@@ -2088,6 +2131,11 @@ public class AppOpsManager {
      * @hide
      */
     public static String opToRestriction(int op) {
+        /// M: CTA requirement - permission control  @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager().opToRestriction(op);
+        }
+        //@}
         return sOpRestrictions[op];
     }
 
@@ -2099,6 +2147,11 @@ public class AppOpsManager {
      */
     @TestApi
     public static int permissionToOpCode(String permission) {
+        /// M: CTA requirement - permission control  @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager().permissionToOpCode(permission);
+        }
+        //@}
         Integer boxedOpCode = sPermToOp.get(permission);
         return boxedOpCode != null ? boxedOpCode : OP_NONE;
     }
@@ -2109,6 +2162,12 @@ public class AppOpsManager {
      * @hide
      */
     public static boolean opAllowSystemBypassRestriction(int op) {
+        /// M: CTA requirement - permission control @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager()
+                    .opAllowSystemBypassRestriction(op);
+        }
+        // @}
         return sOpAllowSystemRestrictionBypass[op];
     }
 
@@ -2117,6 +2176,12 @@ public class AppOpsManager {
      * @hide
      */
     public static @Mode int opToDefaultMode(int op) {
+        /// M: CTA requirement - permission control @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()
+                || op >= sOpDefaultMode.length) {
+            return CtaManagerFactory.getInstance().makeCtaManager().opToDefaultMode(op);
+        }
+        // @}
         return sOpDefaultMode[op];
     }
 
@@ -2151,6 +2216,11 @@ public class AppOpsManager {
      * @hide
      */
     public static boolean opAllowsReset(int op) {
+        /// M: CTA requirement - permission control  @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager().opAllowsReset(op);
+        }
+        //@}
         return !sOpDisableReset[op];
     }
 
@@ -2302,6 +2372,11 @@ public class AppOpsManager {
          * @return This entry's op string name, such as {@link #OPSTR_COARSE_LOCATION}.
          */
         public @NonNull String getOpStr() {
+            /// M: CTA requirement - permission control  @{
+            if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+                return getOpStrs()[mOp];
+            }
+            //@}
             return sOpToString[mOp];
         }
 
@@ -3674,7 +3749,14 @@ public class AppOpsManager {
             if (mHistoricalOps == null) {
                 mHistoricalOps = new ArrayMap<>();
             }
-            final String opStr = sOpToString[opCode];
+            /// M: CTA requirement - permission control  @{
+            String opStr = null;
+            if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+                opStr = getOpStrs()[opCode];
+            } else {
+                opStr = sOpToString[opCode];
+            }
+            //@}
             HistoricalOp op = mHistoricalOps.get(opStr);
             if (op == null) {
                 op = new HistoricalOp(opCode);
@@ -3842,6 +3924,11 @@ public class AppOpsManager {
          * @return The op name.
          */
         public @NonNull String getOpName() {
+            /// M: CTA requirement - permission control  @{
+            if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+                return getOpStrs()[mOp];
+            }
+            //@}
             return sOpToString[mOp];
         }
 
@@ -4661,6 +4748,11 @@ public class AppOpsManager {
      * @return The app op associated with the permission or null.
      */
     public static String permissionToOp(String permission) {
+        /// M: CTA requirement - permission control  @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager().permissionToOp(permission);
+        }
+        //@}
         final Integer opCode = sPermToOp.get(permission);
         if (opCode == null) {
             return null;
@@ -4734,9 +4826,17 @@ public class AppOpsManager {
                         if (callback instanceof OnOpChangedInternalListener) {
                             ((OnOpChangedInternalListener)callback).onOpChanged(op, packageName);
                         }
-                        if (sOpToString[op] != null) {
-                            callback.onOpChanged(sOpToString[op], packageName);
+                        /// M: CTA requirement - permission control  @{
+                        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+                            if (getOpStrs()[op] != null) {
+                                callback.onOpChanged(getOpStrs()[op], packageName);
+                            }
+                        } else {
+                            if (sOpToString[op] != null) {
+                                callback.onOpChanged(sOpToString[op], packageName);
+                            }
                         }
+                        //@}
                     }
                 };
                 mModeWatchers.put(callback, cb);
@@ -4913,6 +5013,11 @@ public class AppOpsManager {
      */
     @TestApi
     public static int strOpToOp(@NonNull String op) {
+        /// M: CTA requirement - permission control  @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager().strOpToOp(op);
+        }
+        //@}
         Integer val = sOpStrToOp.get(op);
         if (val == null) {
             throw new IllegalArgumentException("Unknown operation string: " + op);
@@ -5563,6 +5668,11 @@ public class AppOpsManager {
     @SystemApi
     @TestApi
     public static String[] getOpStrs() {
+        /// M: CTA requirement - permission control  @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return CtaManagerFactory.getInstance().makeCtaManager().getOpStrs();
+        }
+        //@}
         return Arrays.copyOf(sOpToString, sOpToString.length);
     }
 

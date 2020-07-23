@@ -122,6 +122,14 @@ public class GsmAlphabet {
         @UnsupportedAppUsage
         public int languageShiftTable;
 
+        // MTK-START
+        public boolean useSingleShift = false;
+
+        public boolean useLockingShift = false;
+
+        public int shiftLangId = -1;
+        // MTK-END
+
         @Override
         public String toString() {
             return "TextEncodingDetails " +

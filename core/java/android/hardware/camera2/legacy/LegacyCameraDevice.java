@@ -60,8 +60,9 @@ import static com.android.internal.util.Preconditions.*;
  */
 public class LegacyCameraDevice implements AutoCloseable {
     private final String TAG;
-
-    private static final boolean DEBUG = false;
+    //!++
+    private static final boolean DEBUG = ParameterUtils.DEBUG;
+    //!--
     private final int mCameraId;
     private final CameraCharacteristics mStaticCharacteristics;
     private final ICameraDeviceCallbacks mDeviceCallbacks;
@@ -148,8 +149,13 @@ public class LegacyCameraDevice implements AutoCloseable {
                 @Override
                 public void run() {
                     if (DEBUG) {
-                        Log.d(TAG, "doing onError callback for request " + holder.getRequestId() +
-                                ", with error code " + errorCode);
+                        //!++
+                        if (holder != null) {
+                            Log.d(TAG, "doing onError callback for request "
+                                                           + holder.getRequestId()
+                                                           + ", with error code " + errorCode);
+                        }
+                        //!--
                     }
                     try {
                         mDeviceCallbacks.onDeviceError(errorCode, extras);

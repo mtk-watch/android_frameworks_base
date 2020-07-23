@@ -395,7 +395,7 @@ static void load_maps(int pid, stats_t* stats, bool* foundSwapPss)
 static void android_os_Debug_getDirtyPagesPid(JNIEnv *env, jobject clazz,
         jint pid, jobject object)
 {
-    bool foundSwapPss;
+    bool foundSwapPss = false;
     stats_t stats[_NUM_HEAP];
     memset(&stats, 0, sizeof(stats));
 
@@ -439,7 +439,8 @@ static void android_os_Debug_getDirtyPagesPid(JNIEnv *env, jobject clazz,
     }
 
 
-    env->SetBooleanField(object, hasSwappedOutPss_field, foundSwapPss);
+    env->SetBooleanField(object, hasSwappedOutPss_field,
+            foundSwapPss == false ? JNI_FALSE : JNI_TRUE);
     jintArray otherIntArray = (jintArray)env->GetObjectField(object, otherStats_field);
 
     jint* otherArray = (jint*)env->GetPrimitiveArrayCritical(otherIntArray, 0);

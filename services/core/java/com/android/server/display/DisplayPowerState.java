@@ -20,6 +20,7 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemProperties;
 import android.os.Trace;
 import android.util.FloatProperty;
 import android.util.IntProperty;
@@ -49,7 +50,7 @@ import java.io.PrintWriter;
 final class DisplayPowerState {
     private static final String TAG = "DisplayPowerState";
 
-    private static boolean DEBUG = false;
+    private static boolean DEBUG = SystemProperties.getBoolean("dbg.dms.dps", false);
     private static String COUNTER_COLOR_FADE = "ColorFadeLevel";
 
     private final Handler mHandler;

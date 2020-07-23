@@ -18,6 +18,7 @@ package android.opengl;
 
 import android.annotation.UnsupportedAppUsage;
 import android.content.Context;
+import android.os.SystemProperties;
 import android.os.Trace;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -162,13 +163,20 @@ import javax.microedition.khronos.opengles.GL10;
  */
 public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback2 {
     private final static String TAG = "GLSurfaceView";
-    private final static boolean LOG_ATTACH_DETACH = false;
-    private final static boolean LOG_THREADS = false;
-    private final static boolean LOG_PAUSE_RESUME = false;
-    private final static boolean LOG_SURFACE = false;
-    private final static boolean LOG_RENDERER = false;
-    private final static boolean LOG_RENDERER_DRAW_FRAME = false;
-    private final static boolean LOG_EGL = false;
+    private final static boolean LOG_ATTACH_DETACH = SystemProperties.getBoolean(
+            "debug.glsurfaceview.log", false);
+    private final static boolean LOG_THREADS = SystemProperties.getBoolean(
+            "debug.glsurfaceview.log", false);
+    private final static boolean LOG_PAUSE_RESUME = SystemProperties.getBoolean(
+            "debug.glsurfaceview.log", false);
+    private final static boolean LOG_SURFACE = SystemProperties.getBoolean(
+            "debug.glsurfaceview.log", false);
+    private final static boolean LOG_RENDERER = SystemProperties.getBoolean(
+            "debug.glsurfaceview.log", false);
+    private final static boolean LOG_RENDERER_DRAW_FRAME = SystemProperties.getBoolean(
+            "debug.glsurfaceview.log", false);
+    private final static boolean LOG_EGL = SystemProperties.getBoolean(
+            "debug.glsurfaceview.log", false);
     /**
      * The renderer only renders
      * when the surface is created, or when {@link #requestRender} is called.

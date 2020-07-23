@@ -27,6 +27,9 @@ import android.os.Build;
 import android.provider.Telephony;
 import android.telephony.SmsMessage;
 import android.text.Emoji;
+// MTK-START
+import android.telephony.Rlog;
+// MTK-END
 
 /**
  * Base class declaring the specific methods and members for SmsMessage.
@@ -38,8 +41,10 @@ public abstract class SmsMessageBase {
     protected String mScAddress;
 
     /** {@hide} The address of the sender */
+    // MTK-START
     @UnsupportedAppUsage
-    protected SmsAddress mOriginatingAddress;
+    public SmsAddress mOriginatingAddress;
+    // MTK-END
 
     /** {@hide} The address of the receiver */
     protected SmsAddress mRecipientAddress;
@@ -91,12 +96,14 @@ public abstract class SmsMessageBase {
     /**
      * Indicates status for messages stored on the ICC.
      */
-    protected int mStatusOnIcc = -1;
+    // MTK-START
+    public int mStatusOnIcc = -1;
 
     /**
      * Record index of message in the EF.
      */
-    protected int mIndexOnIcc = -1;
+    public int mIndexOnIcc = -1;
+    // MTK-END
 
     /** TP-Message-Reference - Message Reference of sent message. @hide */
     @UnsupportedAppUsage
@@ -348,9 +355,14 @@ public abstract class SmsMessageBase {
     protected void parseMessageBody() {
         // originatingAddress could be null if this message is from a status
         // report.
-        if (mOriginatingAddress != null && mOriginatingAddress.couldBeEmailGateway()) {
+        // MTK-START
+        // Google issue: We don't need to extract the message body if it is a kind of Replace
+        // Short Message Type X defined in 3GPP TS 23.040 section 9.2.3.9
+        if (mOriginatingAddress != null && mOriginatingAddress.couldBeEmailGateway() &&
+                !isReplace()) {
             extractEmailAddressFromMessageBody();
         }
+        // MTK-END
     }
 
     /**
@@ -445,6 +457,15 @@ public abstract class SmsMessageBase {
             while (pos < msgBody.length()) {
                 int nextPos = findNextUnicodePosition(pos, maxUserDataBytesWithHeader,
                         msgBody);
+                // MTK-START
+                // Google issue: we have to avoid infinite while loop in some special case
+                if ((nextPos <= pos) || (nextPos > msgBody.length())) {
+                    Rlog.e("SmsMessageBase", "calcUnicodeEncodingDetails failed (" +
+                              pos + " >= " + nextPos + " or " +
+                              nextPos + " >= " + msgBody.length() + ")");
+                    break;
+                }
+                // MTK-END
                 if (nextPos == msgBody.length()) {
                     ted.codeUnitsRemaining = pos + maxUserDataBytesWithHeader / 2 -
                             msgBody.length();

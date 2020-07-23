@@ -40,5 +40,8 @@ interface IAlarmManager {
     long getNextWakeFromIdleTime();
     @UnsupportedAppUsage
     AlarmManager.AlarmClockInfo getNextAlarmClock(int userId);
+    /// M: added for powerOffAlarm feature @{
+    void cancelPoweroffAlarm(String name);
+    ///@}
     long currentNetworkTimeMillis();
 }

@@ -242,6 +242,10 @@ import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.uri.UriGrantsManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
+/// M: Privacy protected lock support
+import com.mediatek.server.ppl.MtkPplManager;
+import com.mediatek.server.MtkSystemServiceFactory;
+
 import libcore.io.IoUtils;
 
 import org.json.JSONException;
@@ -465,6 +469,10 @@ public class NotificationManagerService extends SystemService {
 
     private MetricsLogger mMetricsLogger;
     private TriPredicate<String, Integer, String> mAllowedManagedServicePackages;
+
+    /// M: Privacy protected lock support
+    public MtkPplManager mMtkPplManager
+            = MtkSystemServiceFactory.getInstance().makeMtkPplManager();
 
     private static class Archive {
         final int mBufferSize;
@@ -892,8 +900,22 @@ public class NotificationManagerService extends SystemService {
         @Override
         public void onNotificationError(int callingUid, int callingPid, String pkg, String tag,
                 int id, int uid, int initialPid, String message, int userId) {
+            final boolean fgService;
+            synchronized (mNotificationLock) {
+                NotificationRecord r = findNotificationLocked(pkg, tag, id, userId);
+                fgService = r != null && (r.getNotification().flags & FLAG_FOREGROUND_SERVICE) != 0;
+            }
             cancelNotification(callingUid, callingPid, pkg, tag, id, 0, 0, false, userId,
                     REASON_ERROR, null);
+            if (fgService) {
+                // Still crash for foreground services, preventing the not-crash behaviour abused
+                // by apps to give us a garbage notification and silently start a fg service.
+                Binder.withCleanCallingIdentity(
+                        () -> mAm.crashApplication(uid, initialPid, pkg, -1,
+                            "Bad notification(tag=" + tag + ", id=" + id + ") posted from package "
+                                + pkg + ", crashing app(uid=" + uid + ", pid=" + initialPid + "): "
+                                + message, true /* force */));
+            }
         }
 
         @Override
@@ -1352,6 +1374,10 @@ public class NotificationManagerService extends SystemService {
                     mPreferencesHelper.onUserUnlocked(userId);
                 }
             }
+            /// M: Privacy protected lock support
+            if (mMtkPplManager.filterPplAction(action)) {
+                mNotificationLight.turnOff();
+            }
         }
     };
 
@@ -1777,6 +1803,9 @@ public class NotificationManagerService extends SystemService {
         filter.addAction(Intent.ACTION_USER_UNLOCKED);
         filter.addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE);
         getContext().registerReceiverAsUser(mIntentReceiver, UserHandle.ALL, filter, null, null);
+        /// M: Privacy protected lock support
+        filter.addAction(mMtkPplManager.PPL_LOCK);
+        filter.addAction(mMtkPplManager.PPL_UNLOCK);
 
         IntentFilter pkgFilter = new IntentFilter();
         pkgFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
@@ -5220,8 +5249,16 @@ public class NotificationManagerService extends SystemService {
             }
 
             synchronized (mNotificationLock) {
-                // Look for the notification, searching both the posted and enqueued lists.
-                NotificationRecord r = findNotificationLocked(mPkg, mTag, mId, mUserId);
+                // If the notification is currently enqueued, repost this runnable so it has a
+                // chance to notify listeners
+                if ((findNotificationByListLocked(mEnqueuedNotifications, mPkg, mTag, mId, mUserId))
+                        != null) {
+                    mHandler.post(this);
+                    return;
+                }
+                // Look for the notification in the posted list, since we already checked enqueued.
+                NotificationRecord r =
+                        findNotificationByListLocked(mNotificationList, mPkg, mTag, mId, mUserId);
                 if (r != null) {
                     // The notification was found, check if it should be removed.
 
@@ -6913,7 +6950,7 @@ public class NotificationManagerService extends SystemService {
         }
 
         // Don't flash while we are in a call or screen is on
-        if (ledNotification == null || mInCall || mScreenOn) {
+        if (ledNotification == null || mInCall || mScreenOn || mMtkPplManager.getPplLockStatus()) {
             mNotificationLight.turnOff();
         } else {
             NotificationRecord.Light light = ledNotification.getLight();
@@ -8456,6 +8493,7 @@ public class NotificationManagerService extends SystemService {
 
     @VisibleForTesting
     protected void simulatePackageSuspendBroadcast(boolean suspend, String pkg) {
+        checkCallerIsSystemOrShell();
         // only use for testing: mimic receive broadcast that package is (un)suspended
         // but does not actually (un)suspend the package
         final Bundle extras = new Bundle();

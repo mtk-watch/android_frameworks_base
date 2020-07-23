@@ -52,12 +52,17 @@ import com.android.server.LocalServices;
 import com.android.server.pm.PackageManagerService;
 import com.android.server.statusbar.StatusBarManagerInternal;
 
+///M: Shutdown Enhancement @{
+import com.mediatek.server.MtkSystemServiceFactory;
+/// @}
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-
-public final class ShutdownThread extends Thread {
+///M: Shutdown Enhancement @{
+public class ShutdownThread extends Thread {
+/// @}
     // constants
     private static final String TAG = "ShutdownThread";
     private static final int ACTION_DONE_POLL_WAIT_MS = 500;
@@ -81,10 +86,13 @@ public final class ShutdownThread extends Thread {
     private static final Object sIsStartedGuard = new Object();
     private static boolean sIsStarted = false;
 
-    private static boolean mReboot;
-    private static boolean mRebootSafeMode;
-    private static boolean mRebootHasProgressBar;
-    private static String mReason;
+
+    ///M: Modify type to "Protected" for Shutdown Enhancement @{
+    protected static boolean mReboot;
+    protected static boolean mRebootSafeMode;
+    protected static boolean mRebootHasProgressBar;
+    protected static String mReason;
+    /// @}
 
     // Provides shutdown assurance in case the system_server is killed
     public static final String SHUTDOWN_ACTION_PROPERTY = "sys.shutdown.requested";
@@ -94,7 +102,11 @@ public final class ShutdownThread extends Thread {
     public static final String RO_SAFEMODE_PROPERTY = "ro.sys.safemode";
 
     // static instance of this thread
-    private static final ShutdownThread sInstance = new ShutdownThread();
+    ///M: Shutdown Enhancement @{
+    //private static final ShutdownThread sInstance = new ShutdownThread();
+    protected static final ShutdownThread sInstance = MtkSystemServiceFactory.getInstance()
+            .makeMtkShutdownThread();
+    /// @}
 
     private static final AudioAttributes VIBRATION_ATTRIBUTES = new AudioAttributes.Builder()
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -118,17 +130,21 @@ public final class ShutdownThread extends Thread {
 
     private final Object mActionDoneSync = new Object();
     private boolean mActionDone;
-    private Context mContext;
-    private PowerManager mPowerManager;
+    ///M: Modify type to "Protected" for Shutdown Enhancement @{
+    protected Context mContext;
+    protected PowerManager mPowerManager;
     private PowerManager.WakeLock mCpuWakeLock;
-    private PowerManager.WakeLock mScreenWakeLock;
-    private Handler mHandler;
+    protected PowerManager.WakeLock mScreenWakeLock;
+    protected Handler mHandler;
+    /// @}
 
     private static AlertDialog sConfirmDialog;
     private ProgressDialog mProgressDialog;
 
-    private ShutdownThread() {
+    ///M: Public ShutdownThread()@{
+    public ShutdownThread() {
     }
+    /// @}
 
     /**
      * Request a clean shutdown, waiting for subsystems to clean up their
@@ -332,11 +348,22 @@ public final class ShutdownThread extends Thread {
         pd.setCancelable(false);
         pd.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
 
-        pd.show();
+        ///M: added for Shutdown Enhancement @{
+        if(sInstance.mIsShowShutdownDialog(context))
+        {
+            pd.show();
+        }
+        /// @}
+
         return pd;
     }
 
     private static boolean showSysuiReboot() {
+        ///M: added for Shutdown Enhancement @{
+        if(!sInstance.mIsShowShutdownSysui()) {
+            return false;
+        }
+        /// @}
         Log.d(TAG, "Attempting to use SysUI shutdown UI");
         try {
             StatusBarManagerInternal service = LocalServices.getService(
@@ -399,7 +426,11 @@ public final class ShutdownThread extends Thread {
         // start the thread that initiates shutdown
         sInstance.mHandler = new Handler() {
         };
-        sInstance.start();
+        ///M: added for Shutdown Enhancement @{
+        if(sInstance.mStartShutdownSeq(context)) {
+            sInstance.start();
+        }
+        /// @}
     }
 
     void actionDone() {
@@ -529,6 +560,10 @@ public final class ShutdownThread extends Thread {
             // done yet, trigger it now.
             uncrypt();
         }
+
+        ///M: added for Shutdown Enhancement@{
+        mShutdownSeqFinish(mContext);
+        /// @}
 
         shutdownTimingLog.traceEnd(); // SystemServerShutdown
         metricEnded(METRIC_SYSTEM_SERVER);
@@ -676,6 +711,11 @@ public final class ShutdownThread extends Thread {
             } catch (InterruptedException unused) {
             }
         }
+
+        ///M: added for shutdown Enhancement@{
+        sInstance.mLowLevelShutdownSeq(context);
+        /// @}
+
         // Shutdown power
         Log.i(TAG, "Performing low-level shutdown...");
         PowerManagerService.lowLevelShutdown(reason);
@@ -768,4 +808,26 @@ public final class ShutdownThread extends Thread {
             }
         }
     }
+
+    ///M: added for Shutdown Enhancement @{
+    protected boolean mIsShowShutdownSysui() {
+        return true;
+    }
+
+    protected boolean mIsShowShutdownDialog(Context c) {
+        return true;
+    }
+
+    protected boolean mStartShutdownSeq(Context c) {
+        return true;
+    }
+
+    protected void mShutdownSeqFinish(Context c) {
+        return;
+    }
+
+    protected void mLowLevelShutdownSeq(Context c) {
+        return;
+    }
+    /// @}
 }

@@ -77,5 +77,7 @@ interface IAppWidgetService {
     boolean requestPinAppWidget(String packageName, in ComponentName providerComponent,
             in Bundle extras, in IntentSender resultIntent);
     boolean isRequestPinAppWidgetSupported();
+    /// M: DuraSpeed
+    List<ComponentName> getAppWidgetOfHost(String pkg, int uid);
 }
 

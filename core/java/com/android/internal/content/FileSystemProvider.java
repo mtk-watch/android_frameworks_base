@@ -19,11 +19,13 @@ package com.android.internal.content;
 import android.annotation.CallSuper;
 import android.annotation.Nullable;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.database.MatrixCursor.RowBuilder;
+import android.drm.DrmManagerClient;
 import android.graphics.Point;
 import android.net.Uri;
 import android.os.Binder;
@@ -87,6 +89,9 @@ public abstract class FileSystemProvider extends DocumentsProvider {
     }
 
     private String[] mDefaultProjection;
+    /// M: for DRMv1.0 support in internal storage @{
+    private DrmManagerClient mDrmClient;
+    /// @}
 
     @GuardedBy("mObservers")
     private final ArrayMap<File, DirectoryObserver> mObservers = new ArrayMap<>();
@@ -117,6 +122,13 @@ public abstract class FileSystemProvider extends DocumentsProvider {
     @CallSuper
     protected void onCreate(String[] defaultProjection) {
         mHandler = new Handler();
+        Context context = getContext();
+        /// M: for DRMv1.0 support in internal storage @{
+        mDrmClient = new DrmManagerClient(context);
+        if (LOG_INOTIFY) {
+           Log.d(TAG, "onCreate: ");
+        }
+        /// @}
         mDefaultProjection = defaultProjection;
     }
 
@@ -451,10 +463,28 @@ public abstract class FileSystemProvider extends DocumentsProvider {
         if (file.isDirectory()) {
             return Document.MIME_TYPE_DIR;
         } else {
+            /// M: for DRMv1.0 support in internal storage @{
             final int lastDot = documentId.lastIndexOf('.');
             if (lastDot >= 0) {
                 final String extension = documentId.substring(lastDot + 1).toLowerCase();
-                final String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
+                if (extension.equals("fl") ||
+                    extension.equals("dm") ||
+                    extension.equals("dcf")) {
+                    if (mDrmClient.canHandle(file.toString(), null)) {
+                        String drmMime = mDrmClient.getOriginalMimeType(file.toString());
+                        if (LOG_INOTIFY) {
+                            Log.d(TAG, " AOSP getDocumentType: DRM mime = " + drmMime);
+                        }
+                        if (!drmMime.isEmpty()) {
+                            return drmMime;
+                        }
+                    }
+                }
+                /// @}
+                String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
+                if (LOG_INOTIFY) {
+                    Log.d(TAG, "getDocumentType: file[" + file.toString() + "] mime[" + mime);
+                }
                 if (mime != null) {
                     return mime;
                 }

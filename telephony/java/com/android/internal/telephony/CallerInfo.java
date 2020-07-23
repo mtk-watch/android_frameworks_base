@@ -43,6 +43,7 @@ import com.android.i18n.phonenumbers.PhoneNumberUtil;
 import com.android.i18n.phonenumbers.Phonenumber.PhoneNumber;
 import com.android.i18n.phonenumbers.geocoding.PhoneNumberOfflineGeocoder;
 
+import java.lang.reflect.Method;
 import java.util.Locale;
 
 
@@ -52,8 +53,8 @@ import java.util.Locale;
  * {@hide}
  */
 public class CallerInfo {
-    private static final String TAG = "CallerInfo";
-    private static final boolean VDBG = Rlog.isLoggable(TAG, Log.VERBOSE);
+    protected static final String TAG = "CallerInfo";
+    protected static final boolean VDBG = Rlog.isLoggable(TAG, Log.VERBOSE);
 
     public static final long USER_TYPE_CURRENT = 0;
     public static final long USER_TYPE_WORK = 1;
@@ -173,6 +174,9 @@ public class CallerInfo {
         userType = USER_TYPE_CURRENT;
     }
 
+    static final String EXTENSION_CLASS_NAME =
+            "com.mediatek.internal.telephony.MtkCallerInfo";
+
     /**
      * getCallerInfo given a Cursor.
      * @param context the context used to retrieve string constants
@@ -182,6 +186,17 @@ public class CallerInfo {
      * number. The returned CallerInfo is null if no number is supplied.
      */
     public static CallerInfo getCallerInfo(Context context, Uri contactRef, Cursor cursor) {
+        try {
+            Class clazz = Class.forName(EXTENSION_CLASS_NAME);
+            Class[] argTypes = new Class[] { Context.class , Uri.class , Cursor.class };
+            Method m = clazz.getDeclaredMethod("getCallerInfo", argTypes);
+            Object[] params = { context, contactRef, cursor };
+            Rlog.d(TAG, "invoke redirect to " + clazz.getName() + "." + m.getName());
+            return (CallerInfo)m.invoke(null, params);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Rlog.d(TAG, "getCallerInfo invoke redirect fails. Use AOSP instead.");
+        }
         CallerInfo info = new CallerInfo();
         info.photoResource = 0;
         info.phoneLabel = null;
@@ -369,6 +384,19 @@ public class CallerInfo {
     @UnsupportedAppUsage
     public static CallerInfo getCallerInfo(Context context, String number, int subId) {
 
+        try {
+            Class clazz = Class.forName(EXTENSION_CLASS_NAME);
+            Class[] argTypes = new Class[] { Context.class , String.class , int.class  };
+            Method m = clazz.getDeclaredMethod("getCallerInfo", argTypes);
+            Object[] params = { context, number, subId };
+            Rlog.d(TAG, "invoke redirect to " + clazz.getName() + "." + m.getName()
+                    + "(subId=" + subId + ")");
+            return (CallerInfo)m.invoke(null, params);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Rlog.d(TAG, "getCallerInfo invoke redirect fails. Use AOSP instead.");
+        }
+
         if (TextUtils.isEmpty(number)) {
             return null;
         }
@@ -379,7 +407,7 @@ public class CallerInfo {
         if (PhoneNumberUtils.isLocalEmergencyNumber(context, number)) {
             return new CallerInfo().markAsEmergency(context);
         } else if (PhoneNumberUtils.isVoiceMailNumber(subId, number)) {
-            return new CallerInfo().markAsVoiceMail();
+            return new CallerInfo().markAsVoiceMail(subId);
         }
 
         Uri contactUri = Uri.withAppendedPath(PhoneLookup.ENTERPRISE_CONTENT_FILTER_URI,
@@ -407,7 +435,7 @@ public class CallerInfo {
      * @param previousResult the result of previous lookup
      * @return previousResult if it's not the case
      */
-    static CallerInfo doSecondaryLookupIfNecessary(Context context,
+    public static CallerInfo doSecondaryLookupIfNecessary(Context context,
             String number, CallerInfo previousResult) {
         if (!previousResult.contactExists
                 && PhoneNumberUtils.isUriNumber(number)) {
@@ -449,7 +477,7 @@ public class CallerInfo {
     // should set the phone number to the dialed number and name to
     // 'Emergency Number' and let the UI make the decision about what
     // should be displayed.
-    /* package */ CallerInfo markAsEmergency(Context context) {
+    /* package */ public CallerInfo markAsEmergency(Context context) {
         phoneNumber = context.getString(
             com.android.internal.R.string.emergency_call_dialog_number_for_display);
         photoResource = com.android.internal.R.drawable.picture_emergency;
@@ -474,7 +502,7 @@ public class CallerInfo {
 
     }
 
-    /* package */ CallerInfo markAsVoiceMail(int subId) {
+    /* package */ public CallerInfo markAsVoiceMail(int subId) {
         mIsVoiceMail = true;
 
         try {
@@ -495,7 +523,7 @@ public class CallerInfo {
         return this;
     }
 
-    private static String normalize(String s) {
+    protected static String normalize(String s) {
         if (s == null || s.length() > 0) {
             return s;
         } else {
@@ -527,7 +555,7 @@ public class CallerInfo {
      * can at least make sure we handle all the URI patterns we claim to,
      * and that the mime types match what we expect...)
      */
-    private static int getColumnIndexForPersonId(Uri contactRef, Cursor cursor) {
+    protected static int getColumnIndexForPersonId(Uri contactRef, Cursor cursor) {
         // TODO: This is pretty ugly now, see bug 2269240 for
         // more details. The column to use depends upon the type of URL:
         // - content://com.android.contacts/data/phones ==> use the "contact_id" column
@@ -657,7 +685,7 @@ public class CallerInfo {
         return countryIso;
     }
 
-    protected static String getCurrentCountryIso(Context context) {
+    public static String getCurrentCountryIso(Context context) {
         return getCurrentCountryIso(context, Locale.getDefault());
     }
 

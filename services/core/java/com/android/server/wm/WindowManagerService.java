@@ -109,6 +109,12 @@ import static com.android.server.wm.WindowManagerServiceDumpProto.POLICY;
 import static com.android.server.wm.WindowManagerServiceDumpProto.ROOT_WINDOW_CONTAINER;
 import static com.android.server.wm.WindowManagerServiceDumpProto.ROTATION;
 
+/// M: MTK Power: rotation boost Mechanism
+import com.mediatek.server.powerhal.PowerHalManager;
+/// M: WindowManager debug Mechanism
+import com.mediatek.server.wm.WindowManagerDebugger;
+import com.mediatek.server.MtkSystemServiceFactory;
+
 import android.Manifest;
 import android.Manifest.permission;
 import android.animation.ValueAnimator;
@@ -282,15 +288,20 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
+/// M: add for wms new feature @{
+import com.mediatek.server.MtkSystemServiceFactory;
+import com.mediatek.server.wm.WmsExt;
+/// @}
+
 /** {@hide} */
 public class WindowManagerService extends IWindowManager.Stub
         implements Watchdog.Monitor, WindowManagerPolicy.WindowManagerFuncs {
-    private static final String TAG = TAG_WITH_CLASS_NAME ? "WindowManagerService" : TAG_WM;
+    static final String TAG = TAG_WITH_CLASS_NAME ? "WindowManagerService" : TAG_WM;
 
     static final int LAYOUT_REPEAT_THRESHOLD = 4;
 
-    static final boolean PROFILE_ORIENTATION = false;
-    static final boolean localLOGV = DEBUG;
+    static boolean PROFILE_ORIENTATION = false;
+    public static boolean localLOGV = DEBUG;
 
     /** How much to multiply the policy's type layer, to reserve room
      * for multiple windows of the same type and Z-ordering adjustment
@@ -407,6 +418,13 @@ public class WindowManagerService extends IWindowManager.Stub
             }
         }
     };
+
+    /// M: MTK Power: rotation boost Mechanism
+    public PowerHalManager mPowerHalManager =
+                    MtkSystemServiceFactory.getInstance().makePowerHalManager();
+    /// M: Add WindowManager debug Mechanism
+    public WindowManagerDebugger mWindowManagerDebugger =
+                    MtkSystemServiceFactory.getInstance().makeWindowManagerDebugger();
 
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -1185,6 +1203,11 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         showEmulatorDisplayOverlayIfNeeded();
+        /// M: Add for App Resolution Tuner @{
+        if (mWmsExt.isAppResolutionTunerSupport()) {
+            mWmsExt.loadResolutionTunerAppList();
+        }
+        /// @}
     }
 
     public InputManagerCallback getInputManagerCallback() {
@@ -1820,6 +1843,12 @@ public class WindowManagerService extends IWindowManager.Stub
 
         if (dc != null && !mWindowPlacerLocked.isInLayout()) {
             dc.assignWindowLayers(true /* setLayoutNeeded */);
+            // M: Force changing the focus window
+            // after current focus window removed @{
+            if (getFocusedWindow() == win) {
+                mFocusMayChange = true;
+            }
+            // @}
             mWindowPlacerLocked.performSurfacePlacement();
             if (win.mAppToken != null) {
                 win.mAppToken.updateReportedVisibilityLocked();
@@ -2016,6 +2045,9 @@ public class WindowManagerService extends IWindowManager.Stub
                     win.mSystemUiVisibility = systemUiVisibility;
                 }
                 if (win.mAttrs.type != attrs.type) {
+                    /// M: Add more log at WMS
+                    mWindowManagerDebugger.debugRelayoutWindow(TAG, win,
+                                                win.mAttrs.type, attrs.type);
                     throw new IllegalArgumentException(
                             "Window type can not be changed after the window is added.");
                 }
@@ -2059,7 +2091,16 @@ public class WindowManagerService extends IWindowManager.Stub
 
             if (DEBUG_LAYOUT) Slog.v(TAG_WM, "Relayout " + win + ": viewVisibility=" + viewVisibility
                     + " req=" + requestedWidth + "x" + requestedHeight + " " + win.mAttrs);
+            /// M: Enable more google log at WMS
+            if (DEBUG_LAYOUT) mWindowManagerDebugger.debugInputAttr(TAG, attrs);
+
             winAnimator.mSurfaceDestroyDeferred = (flags & RELAYOUT_DEFER_SURFACE_DESTROY) != 0;
+            /// M: Add for App Resolution Tuner @{
+            if (mWmsExt.isAppResolutionTunerSupport()) {
+                mWmsExt.setWindowScaleByWL(
+                    win,win.getDisplayInfo(),win.mAttrs,requestedWidth,requestedHeight);
+            }
+            /// @}
             if ((attrChanges & WindowManager.LayoutParams.ALPHA_CHANGED) != 0) {
                 winAnimator.mAlpha = attrs.alpha;
             }
@@ -2096,15 +2137,21 @@ public class WindowManagerService extends IWindowManager.Stub
             win.mInRelayout = true;
 
             win.mViewVisibility = viewVisibility;
-            if (DEBUG_SCREEN_ON) {
+            /// M: WMS log reduction
+            if (DEBUG_SCREEN_ON && mWindowManagerDebugger.WMS_DEBUG_LOG_OFF) {
                 RuntimeException stack = new RuntimeException();
                 stack.fillInStackTrace();
                 Slog.i(TAG_WM, "Relayout " + win + ": oldVis=" + oldVisibility
                         + " newVis=" + viewVisibility, stack);
             }
-
             win.setDisplayLayoutNeeded();
             win.mGivenInsetsPending = (flags & WindowManagerGlobal.RELAYOUT_INSETS_PENDING) != 0;
+
+            /// M: Add more log at WMS
+            if (mWindowManagerDebugger.WMS_DEBUG_USER) {
+                mWindowManagerDebugger.debugViewVisibility(TAG, win, viewVisibility,
+                            oldVisibility, focusMayChange);
+            }
 
             // We should only relayout if the view is visible, it is a starting window, or the
             // associated appToken is not hidden.
@@ -3220,7 +3267,8 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     void enableScreenIfNeededLocked() {
-        if (DEBUG_BOOT) {
+        /// M: WMS log reduction
+        if (DEBUG_BOOT && mWindowManagerDebugger.WMS_DEBUG_LOG_OFF) {
             RuntimeException here = new RuntimeException("here");
             here.fillInStackTrace();
             Slog.i(TAG_WM, "enableScreenIfNeededLocked: mDisplayEnabled=" + mDisplayEnabled
@@ -3257,7 +3305,8 @@ public class WindowManagerService extends IWindowManager.Stub
 
     private void performEnableScreen() {
         synchronized (mGlobalLock) {
-            if (DEBUG_BOOT) Slog.i(TAG_WM, "performEnableScreen: mDisplayEnabled=" + mDisplayEnabled
+            if (DEBUG_BOOT|| mWindowManagerDebugger.WMS_DEBUG_ENG)
+                Slog.i(TAG_WM, "performEnableScreen: mDisplayEnabled=" + mDisplayEnabled
                     + " mForceDisplayEnabled=" + mForceDisplayEnabled
                     + " mShowingBootMessages=" + mShowingBootMessages
                     + " mSystemBooted=" + mSystemBooted
@@ -3304,6 +3353,9 @@ public class WindowManagerService extends IWindowManager.Stub
                     surfaceFlinger.transact(IBinder.FIRST_CALL_TRANSACTION, // BOOT_FINISHED
                             data, null, 0);
                     data.recycle();
+                    if (mWindowManagerDebugger.WMS_DEBUG_ENG) {
+                        Slog.d(TAG, "Tell SurfaceFlinger finish boot animation");
+                    }
                 }
             } catch (RemoteException ex) {
                 Slog.e(TAG_WM, "Boot completed: SurfaceFlinger is dead!");
@@ -6218,6 +6270,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
     private void doDump(FileDescriptor fd, PrintWriter pw, String[] args, boolean useProto) {
         if (!DumpUtils.checkDumpPermission(mContext, TAG, pw)) return;
+
         boolean dumpAll = false;
 
         int opti = 0;
@@ -6251,6 +6304,9 @@ public class WindowManagerService extends IWindowManager.Stub
                 pw.println("  -a: include all available server state.");
                 pw.println("  --proto: output dump in protocol buffer format.");
                 return;
+            } else if ("-d".equals(opt)) {
+                mWindowManagerDebugger.runDebug(pw, args, opti);
+                return;
             } else {
                 pw.println("Unknown argument: " + opt + "; use -h for help");
             }
@@ -6264,6 +6320,10 @@ public class WindowManagerService extends IWindowManager.Stub
             proto.flush();
             return;
         }
+        /// M: print the current date and time {@
+        java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("yyyy-MM-dd hh:mm:ss.SSS");
+        pw.println("Dump time : " + df.format(new Date()));
+        /// @}
         // Is the caller requesting to dump a particular piece of data?
         if (opti < args.length) {
             String cmd = args[opti];
@@ -7721,6 +7781,10 @@ public class WindowManagerService extends IWindowManager.Stub
             mGlobalLock.notifyAll();
         }
     }
+
+    /// M: add for fullscreen switch feature @{
+    private WmsExt mWmsExt = MtkSystemServiceFactory.getInstance().makeWmsExt();
+    /// @}
 
     private void onPointerDownOutsideFocusLocked(IBinder touchedToken) {
         final WindowState touchedWindow = windowForClientLocked(null, touchedToken, false);

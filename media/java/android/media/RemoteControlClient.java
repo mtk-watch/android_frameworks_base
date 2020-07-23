@@ -24,6 +24,7 @@ import android.graphics.Bitmap;
 import android.media.session.MediaSession;
 import android.media.session.MediaSessionLegacyHelper;
 import android.media.session.PlaybackState;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -57,7 +58,8 @@ import android.util.Log;
 @Deprecated public class RemoteControlClient
 {
     private final static String TAG = "RemoteControlClient";
-    private final static boolean DEBUG = false;
+    private final static boolean DEBUG = "eng".equals(Build.TYPE)
+    || "userdebug".equals(Build.TYPE);
 
     /**
      * Playback state of a RemoteControlClient which is stopped.

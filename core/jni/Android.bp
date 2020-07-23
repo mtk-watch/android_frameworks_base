@@ -145,7 +145,6 @@ cc_library_shared {
         "android/graphics/PathMeasure.cpp",
         "android/graphics/PathEffect.cpp",
         "android/graphics/Picture.cpp",
-        "android/graphics/BitmapRegionDecoder.cpp",
         "android/graphics/Region.cpp",
         "android/graphics/Shader.cpp",
         "android/graphics/SurfaceTexture.cpp",
@@ -324,4 +323,28 @@ cc_library_shared {
         // GraphicsJNI.h includes hwui headers
         "libhwui",
     ],
+    defaults: [
+        "mtk_jpeg_enhance_art_defaults",
+    ],
+}
+bootstrap_go_package {
+    name: "soon-jpegenhance-art",
+    pkgPath: "android/soong/jpegenhance-art",
+    deps: [
+        "blueprint",
+        "blueprint-pathtools",
+        "soong",
+        "soong-android",
+        "soong-cc",
+        "soong-genrule",
+        "soong-android-mediatek",
+    ],
+    srcs: [
+        "mtkjpeg.go",
+    ],
+    pluginFor: ["soong_build"],
+}
+
+mtk_jpeg_enhance_art_defaults {
+    name: "mtk_jpeg_enhance_art_defaults",
 }

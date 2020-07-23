@@ -192,7 +192,6 @@ public class WallpaperManager {
      * Flag: set or retrieve the lock-screen-specific wallpaper.
      */
     public static final int FLAG_LOCK = 1 << 1;
-
     private final Context mContext;
 
     /**

@@ -206,7 +206,9 @@ public class VideoCallImpl extends VideoCall {
     VideoCallImpl(IVideoProvider videoProvider, String callingPackageName, int targetSdkVersion)
             throws RemoteException {
         mVideoProvider = videoProvider;
-        mVideoProvider.asBinder().linkToDeath(mDeathRecipient, 0);
+        /// M: As binderDied event is never be received with current design,
+        // comment it to fix memory leak problem.
+        //mVideoProvider.asBinder().linkToDeath(mDeathRecipient, 0);
 
         mBinder = new VideoCallListenerBinder();
         mVideoProvider.addVideoCallback(mBinder);

@@ -281,7 +281,9 @@ import com.android.internal.annotations.GuardedBy;
     }
 
     /*package*/ void setBluetoothScoOn(boolean on, String eventSource) {
-        //Log.i(TAG, "setBluetoothScoOnInt: " + on + " " + eventSource);
+        if (AudioService.DEBUG_DEVICES) {
+            Log.i(TAG, "setBluetoothScoOn: " + on + " " + eventSource);
+        }
         synchronized (mDeviceStateLock) {
             if (on) {
                 // do not accept SCO ON if SCO audio is not connected
@@ -608,6 +610,12 @@ import com.android.internal.annotations.GuardedBy;
         }
         AudioService.sForceUseLogger.log(
                 new AudioServiceEvents.ForceUseEvent(useCase, config, eventSource));
+        if (AudioService.DEBUG_DEVICES) {
+          Log.i(TAG, new StringBuilder("setForceUse(")
+            .append(AudioSystem.forceUseUsageToString(useCase))
+            .append(", ").append(AudioSystem.forceUseConfigToString(config))
+            .append(") due to ").append(eventSource).toString());
+        }
         AudioSystem.setForceUse(useCase, config);
     }
 

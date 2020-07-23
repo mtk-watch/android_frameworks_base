@@ -83,4 +83,7 @@ oneway interface IInCallAdapter {
 
     void handoverTo(String callId, in PhoneAccountHandle destAcct, int videoState,
             in Bundle extras);
+
+    /** M: Mediatek APIs related with call operations */
+    void doMtkAction(in Bundle params);
 }

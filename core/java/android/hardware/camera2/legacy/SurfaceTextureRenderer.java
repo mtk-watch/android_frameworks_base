@@ -40,6 +40,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -49,7 +50,9 @@ import java.util.List;
  */
 public class SurfaceTextureRenderer {
     private static final String TAG = SurfaceTextureRenderer.class.getSimpleName();
-    private static final boolean DEBUG = false;
+    //!++
+    private static final boolean DEBUG = ParameterUtils.DEBUG;
+    //!--
     private static final int EGL_RECORDABLE_ANDROID = 0x3142; // from EGL/eglext.h
     private static final int GL_MATRIX_SIZE = 16;
     private static final int VERTEX_POS_SIZE = 3;
@@ -836,8 +839,21 @@ public class SurfaceTextureRenderer {
                     LegacyCameraDevice.setSurfaceDimens(holder.surface, holder.width,
                             holder.height);
                     LegacyCameraDevice.setNextTimestamp(holder.surface, captureHolder.second);
-                    LegacyCameraDevice.produceFrame(holder.surface, mPBufferPixels.array(),
+                    //!++ fix pixel data shift.
+                    byte[] pixelArray;
+                    if (mPBufferPixels.arrayOffset() == 0) {
+                        pixelArray = mPBufferPixels.array();
+                    } else {
+                        pixelArray = Arrays.copyOfRange(
+                                mPBufferPixels.array(),
+                                mPBufferPixels.arrayOffset(),
+                                mPBufferPixels.capacity() + mPBufferPixels.arrayOffset());
+                    }
+                    LegacyCameraDevice.produceFrame(holder.surface, pixelArray,
                             holder.width, holder.height, format);
+                    //!++
+                    Log.i(TAG, "drawIntoSurfaces produceFrame --.");
+                    //!--
                 } catch (LegacyExceptionUtils.BufferQueueAbandonedException e) {
                     Log.w(TAG, "Surface abandoned, dropping frame. ", e);
                     request.setOutputAbandoned();

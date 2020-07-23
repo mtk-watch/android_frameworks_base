@@ -42,8 +42,9 @@ import static android.hardware.camera2.CaptureRequest.*;
 @SuppressWarnings("deprecation")
 public class LegacyRequestMapper {
     private static final String TAG = "LegacyRequestMapper";
-    private static final boolean DEBUG = false;
-
+    //!++
+    private static final boolean DEBUG = ParameterUtils.DEBUG;
+    //!--
     /** Default quality for android.jpeg.quality, android.jpeg.thumbnailQuality */
     private static final byte DEFAULT_JPEG_QUALITY = 85;
 

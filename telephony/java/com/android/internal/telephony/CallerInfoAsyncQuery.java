@@ -36,6 +36,7 @@ import android.text.TextUtils;
 import android.telephony.Rlog;
 import android.telephony.SubscriptionManager;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,23 +47,23 @@ import java.util.List;
  * {@hide}
  */
 public class CallerInfoAsyncQuery {
-    private static final boolean DBG = false;
-    private static final String LOG_TAG = "CallerInfoAsyncQuery";
+    protected static final boolean DBG = false;
+    protected static final String LOG_TAG = "CallerInfoAsyncQuery";
 
-    private static final int EVENT_NEW_QUERY = 1;
+    protected static final int EVENT_NEW_QUERY = 1;
     private static final int EVENT_ADD_LISTENER = 2;
-    private static final int EVENT_END_OF_QUEUE = 3;
-    private static final int EVENT_EMERGENCY_NUMBER = 4;
-    private static final int EVENT_VOICEMAIL_NUMBER = 5;
-    private static final int EVENT_GET_GEO_DESCRIPTION = 6;
+    public static final int EVENT_END_OF_QUEUE = 3;
+    protected static final int EVENT_EMERGENCY_NUMBER = 4;
+    protected static final int EVENT_VOICEMAIL_NUMBER = 5;
+    public static final int EVENT_GET_GEO_DESCRIPTION = 6;
 
-    private CallerInfoAsyncQueryHandler mHandler;
+    protected CallerInfoAsyncQueryHandler mHandler;
 
     // If the CallerInfo query finds no contacts, should we use the
     // PhoneNumberOfflineGeocoder to look up a "geo description"?
     // (TODO: This could become a flag in config.xml if it ever needs to be
     // configured on a per-product basis.)
-    private static final boolean ENABLE_UNKNOWN_NUMBER_GEO_DESCRIPTION = true;
+    public static final boolean ENABLE_UNKNOWN_NUMBER_GEO_DESCRIPTION = true;
 
     /**
      * Interface for a CallerInfoAsyncQueryHandler result return.
@@ -79,7 +80,7 @@ public class CallerInfoAsyncQuery {
      * Wrap the cookie from the WorkerArgs with additional information needed by our
      * classes.
      */
-    private static final class CookieWrapper {
+    public static final class CookieWrapper {
         public OnQueryCompleteListener listener;
         public Object cookie;
         public int event;
@@ -128,7 +129,7 @@ public class CallerInfoAsyncQuery {
     /**
      * Our own implementation of the AsyncQueryHandler.
      */
-    private class CallerInfoAsyncQueryHandler extends AsyncQueryHandler {
+    public class CallerInfoAsyncQueryHandler extends AsyncQueryHandler {
 
         /*
          * The information relevant to each CallerInfo query.  Each query may have multiple
@@ -145,10 +146,10 @@ public class CallerInfoAsyncQuery {
          * context resolver (obtained via {@link #getCurrentProfileContentResolver) and pass it
          * to the super class.
          */
-        private Context mContext;
-        private Uri mQueryUri;
-        private CallerInfo mCallerInfo;
-        private List<Runnable> mPendingListenerCallbacks = new ArrayList<>();
+        protected Context mContext;
+        public Uri mQueryUri;
+        protected CallerInfo mCallerInfo;
+        protected List<Runnable> mPendingListenerCallbacks = new ArrayList<>();
 
         /**
          * Our own query worker thread.
@@ -245,7 +246,7 @@ public class CallerInfoAsyncQuery {
         /**
          * Asynchronous query handler class for the contact / callerinfo object.
          */
-        private CallerInfoAsyncQueryHandler(Context context) {
+        protected CallerInfoAsyncQueryHandler(Context context) {
             super(getCurrentProfileContentResolver(context));
             mContext = context;
         }
@@ -387,10 +388,13 @@ public class CallerInfoAsyncQuery {
         }
     }
 
+    static final String EXTENSION_CLASS_NAME =
+            "com.mediatek.internal.telephony.MtkCallerInfoAsyncQuery";
+
     /**
      * Private constructor for factory methods.
      */
-    private CallerInfoAsyncQuery() {
+    protected CallerInfoAsyncQuery() {
     }
 
 
@@ -399,6 +403,19 @@ public class CallerInfoAsyncQuery {
      */
     public static CallerInfoAsyncQuery startQuery(int token, Context context, Uri contactRef,
             OnQueryCompleteListener listener, Object cookie) {
+
+        try {
+            Class clazz = Class.forName(EXTENSION_CLASS_NAME);
+            Class[] argTypes = new Class[] { int.class, Context.class, Uri.class,
+                    OnQueryCompleteListener.class, Object.class };
+            Method m = clazz.getDeclaredMethod("startQuery", argTypes);
+            Object[] params = { token, context, contactRef, listener, cookie };
+            Rlog.d(LOG_TAG, "invoke redirect to " + clazz.getName() + "." + m.getName());
+            return (CallerInfoAsyncQuery)m.invoke(null, params);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Rlog.d(LOG_TAG, "startQuery invoke redirect fails. Use AOSP instead.");
+        }
 
         CallerInfoAsyncQuery c = new CallerInfoAsyncQuery();
         c.allocate(context, contactRef);
@@ -447,6 +464,20 @@ public class CallerInfoAsyncQuery {
      */
     public static CallerInfoAsyncQuery startQuery(int token, Context context, String number,
             OnQueryCompleteListener listener, Object cookie, int subId) {
+
+        try {
+            Class clazz = Class.forName(EXTENSION_CLASS_NAME);
+            Class[] argTypes = new Class[] { int.class, Context.class, String.class,
+                    OnQueryCompleteListener.class, Object.class, int.class };
+            Method m = clazz.getDeclaredMethod("startQuery", argTypes);
+            Object[] params = { token, context, number, listener, cookie, subId };
+            Rlog.d(LOG_TAG, "invoke redirect to " + clazz.getName() + "." + m.getName()
+                    + "(subId=" + subId + ")");
+            return (CallerInfoAsyncQuery)m.invoke(null, params);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Rlog.d(LOG_TAG, "startQuery invoke redirect fails. Use AOSP instead.");
+        }
 
         if (DBG) {
             Rlog.d(LOG_TAG, "##### CallerInfoAsyncQuery startQuery()... #####");
@@ -516,7 +547,7 @@ public class CallerInfoAsyncQuery {
      * Method to create a new CallerInfoAsyncQueryHandler object, ensuring correct
      * state of context and uri.
      */
-    private void allocate(Context context, Uri contactRef) {
+    protected void allocate(Context context, Uri contactRef) {
         if ((context == null) || (contactRef == null)){
             throw new QueryPoolException("Bad context or query uri.");
         }
@@ -527,14 +558,14 @@ public class CallerInfoAsyncQuery {
     /**
      * Releases the relevant data.
      */
-    private void release() {
+    public void release() {
         mHandler.mContext = null;
         mHandler.mQueryUri = null;
         mHandler.mCallerInfo = null;
         mHandler = null;
     }
 
-    private static String sanitizeUriToString(Uri uri) {
+    protected static String sanitizeUriToString(Uri uri) {
         if (uri != null) {
             String uriString = uri.toString();
             int indexOfLastSlash = uriString.lastIndexOf('/');

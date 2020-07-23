@@ -59,7 +59,9 @@ import java.util.concurrent.FutureTask;
 public class ServiceWatcher implements ServiceConnection {
 
     private static final String TAG = "ServiceWatcher";
-    private static final boolean D = false;
+    /// M: [Debug] force to log ServiceWatcher log
+    private static final boolean D = true;
+    /// M: mtk add end
 
     public static final String EXTRA_SERVICE_VERSION = "serviceVersion";
     public static final String EXTRA_SERVICE_IS_MULTIUSER = "serviceIsMultiuser";

@@ -25,6 +25,7 @@ import android.media.AudioSystem;
 import android.media.IRecordingConfigDispatcher;
 import android.media.MediaRecorder;
 import android.media.audiofx.AudioEffect;
+import android.os.Build;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
@@ -43,6 +44,8 @@ public final class RecordingActivityMonitor implements AudioSystem.AudioRecordin
 
     public final static String TAG = "AudioService.RecordingActivityMonitor";
 
+    private static final boolean DEBUG = "eng".equals(Build.TYPE)
+        || "userdebug".equals(Build.TYPE);
     private ArrayList<RecMonitorClient> mClients = new ArrayList<RecMonitorClient>();
     // a public client is one that needs an anonymized version of the playback configurations, we
     // keep track of whether there is at least one to know when we need to create the list of
@@ -134,6 +137,16 @@ public final class RecordingActivityMonitor implements AudioSystem.AudioRecordin
         if (MediaRecorder.isSystemOnlyAudioSource(source)) {
             // still want to log event, it just won't appear in recording configurations;
             sEventLogger.log(new RecordingEvent(event, riid, config).printLog(TAG));
+            if (DEBUG) {
+                Log.i(TAG, new StringBuilder("onRecordingConfigurationChanged(")
+                    .append("uid=").append(uid)
+                    .append("riid=").append(riid)
+                    .append("event=").append(event)
+                    .append("session=").append(session)
+                    .append("source=").append(source)
+                    .append("config=").append(config)
+                    .append("packName=").append(packName).toString());
+            }
             return;
         }
         dispatchCallbacks(updateSnapshot(event, riid, config));

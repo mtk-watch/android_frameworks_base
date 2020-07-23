@@ -27,6 +27,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.SystemProperties;
 import android.telephony.AccessNetworkConstants.AccessNetworkType;
 import android.telephony.AccessNetworkConstants.TransportType;
 import android.telephony.NetworkRegistrationInfo.Domain;
@@ -40,6 +41,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+// MTK-START: add-on
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+// MTK-END
 
 /**
  * Contains phone state and service related information.
@@ -126,7 +132,8 @@ public class ServiceState implements Parcelable {
      */
     public static final int FREQUENCY_RANGE_MMWAVE = 4;
 
-    private static final List<Integer> FREQUENCY_RANGE_ORDER = Arrays.asList(
+    /** @hide */
+    protected static final List<Integer> FREQUENCY_RANGE_ORDER = Arrays.asList(
             FREQUENCY_RANGE_UNKNOWN,
             FREQUENCY_RANGE_LOW,
             FREQUENCY_RANGE_MID,
@@ -246,8 +253,11 @@ public class ServiceState implements Parcelable {
 
     /**
      * The number of the radio technologies.
+    // MTK-START: add-on
+     * @hide
+    // MTK-END
      */
-    private static final int NEXT_RIL_RADIO_TECHNOLOGY = 21;
+    protected static final int NEXT_RIL_RADIO_TECHNOLOGY = 21;
 
     /** @hide */
     public static final int RIL_RADIO_CDMA_TECHNOLOGY_BITMASK =
@@ -259,8 +269,12 @@ public class ServiceState implements Parcelable {
                     | (1 << (RIL_RADIO_TECHNOLOGY_EVDO_B - 1))
                     | (1 << (RIL_RADIO_TECHNOLOGY_EHRPD - 1));
 
-    private int mVoiceRegState = STATE_OUT_OF_SERVICE;
-    private int mDataRegState = STATE_OUT_OF_SERVICE;
+    // MTK-START: add-on
+    /** @hide */
+    protected int mVoiceRegState = STATE_OUT_OF_SERVICE;
+    /** @hide */
+    protected int mDataRegState = STATE_OUT_OF_SERVICE;
+    // MTK-END
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -302,46 +316,73 @@ public class ServiceState implements Parcelable {
      */
     public static final int UNKNOWN_ID = -1;
 
-    private String mVoiceOperatorAlphaLong;
-    private String mVoiceOperatorAlphaShort;
-    private String mVoiceOperatorNumeric;
-    private String mDataOperatorAlphaLong;
-    private String mDataOperatorAlphaShort;
-    private String mDataOperatorNumeric;
+    // MTK-START: add-on
+    /** @hide */
+    protected String mVoiceOperatorAlphaLong;
+    /** @hide */
+    protected String mVoiceOperatorAlphaShort;
+    /** @hide */
+    protected String mVoiceOperatorNumeric;
+    /** @hide */
+    protected String mDataOperatorAlphaLong;
+    /** @hide */
+    protected String mDataOperatorAlphaShort;
+    /** @hide */
+    protected String mDataOperatorNumeric;
+    /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
-    private boolean mIsManualNetworkSelection;
+    protected boolean mIsManualNetworkSelection;
 
-    private boolean mIsEmergencyOnly;
+    /** @hide */
+    protected boolean mIsEmergencyOnly;
 
+    /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
-    private boolean mCssIndicator;
+    protected boolean mCssIndicator;
+    /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
-    private int mNetworkId;
+    protected int mNetworkId;
+    /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
-    private int mSystemId;
+    protected int mSystemId;
+    /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
-    private int mCdmaRoamingIndicator;
+    protected int mCdmaRoamingIndicator;
+    /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
-    private int mCdmaDefaultRoamingIndicator;
+    protected int mCdmaDefaultRoamingIndicator;
+    /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
-    private int mCdmaEriIconIndex;
+    protected int mCdmaEriIconIndex;
+    /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
-    private int mCdmaEriIconMode;
+    protected int mCdmaEriIconMode;
+    /** @hide */
+    @UnsupportedAppUsage
+    protected boolean mIsUsingCarrierAggregation;
 
+    /** @hide */
     @FrequencyRange
-    private int mNrFrequencyRange;
-    private int mChannelNumber;
-    private int[] mCellBandwidths = new int[0];
+    protected int mNrFrequencyRange;
+    /** @hide */
+    protected int mChannelNumber;
+    /** @hide */
+    protected int[] mCellBandwidths = new int[0];
 
     /* EARFCN stands for E-UTRA Absolute Radio Frequency Channel Number,
      * Reference: 3GPP TS 36.104 5.4.3 */
-    private int mLteEarfcnRsrpBoost = 0;
 
-    private final List<NetworkRegistrationInfo> mNetworkRegistrationInfos = new ArrayList<>();
-
-    private String mOperatorAlphaLongRaw;
-    private String mOperatorAlphaShortRaw;
-    private boolean mIsIwlanPreferred;
+    /** @hide */
+    protected int mLteEarfcnRsrpBoost = 0;
+    /** @hide */
+    protected List<NetworkRegistrationInfo> mNetworkRegistrationInfos = new ArrayList<>();
+    /** @hide */
+    protected String mOperatorAlphaLongRaw;
+    /** @hide */
+    protected String mOperatorAlphaShortRaw;
+    /** @hide */
+    protected boolean mIsIwlanPreferred;
+    // MTK-END
 
     /**
      * get String description of roaming type
@@ -505,7 +546,9 @@ public class ServiceState implements Parcelable {
     public static final @android.annotation.NonNull Parcelable.Creator<ServiceState> CREATOR =
             new Parcelable.Creator<ServiceState>() {
         public ServiceState createFromParcel(Parcel in) {
-            return new ServiceState(in);
+            // MTK-START: add-on
+            return makeServiceState(in);
+            // MTK-START: add-on
         }
 
         public ServiceState[] newArray(int size) {
@@ -1054,7 +1097,10 @@ public class ServiceState implements Parcelable {
         }
     }
 
-    private void init() {
+    // MTK-START: add-on
+    /** @hide */
+    protected void init() {
+    // MTK-END
         if (DBG) Rlog.d(LOG_TAG, "init");
         mVoiceRegState = STATE_OUT_OF_SERVICE;
         mDataRegState = STATE_OUT_OF_SERVICE;
@@ -1278,9 +1324,12 @@ public class ServiceState implements Parcelable {
      * @param a first obj
      * @param b second obj
      * @return true if two objects equal or both are null
+    // MTK-START: add-on
+     * @hide
+    // MTK-END
      */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
-    private static boolean equalsHandlesNulls (Object a, Object b) {
+    protected static boolean equalsHandlesNulls (Object a, Object b) {
         return (a == null) ? (b == null) : a.equals (b);
     }
 
@@ -1291,7 +1340,9 @@ public class ServiceState implements Parcelable {
      * @hide
      */
     @UnsupportedAppUsage
-    private void setFromNotifierBundle(Bundle m) {
+    // MTK-START: add-on
+    protected void setFromNotifierBundle(Bundle m) {
+    // MTK-END
         ServiceState ssFromBundle = m.getParcelable(Intent.EXTRA_SERVICE_STATE);
         if (ssFromBundle != null) {
             copyFrom(ssFromBundle);
@@ -1997,4 +2048,38 @@ public class ServiceState implements Parcelable {
     public void setIwlanPreferred(boolean isIwlanPreferred) {
         mIsIwlanPreferred = isIwlanPreferred;
     }
+
+    // MTK-START: Provide create service state function
+    private static ServiceState makeServiceState(Parcel in) {
+        ServiceState sInstance;
+        if (SystemProperties.get("ro.vendor.mtk_telephony_add_on_policy", "0").equals("0")) {
+            String className = "mediatek.telephony.MtkServiceState";
+            Class<?> clazz = null;
+            try {
+                clazz = Class.forName(className);
+                Constructor clazzConstructfunc = clazz.getConstructor(Parcel.class);
+                clazzConstructfunc.setAccessible(true);
+                sInstance = (ServiceState) clazzConstructfunc.newInstance(in);
+            // tk solution should not run into these exceptions
+            } catch (InstantiationException e) {
+                e.printStackTrace();
+                Rlog.e(LOG_TAG, "MtkServiceState InstantiationException! Used AOSP instead!");
+                sInstance = new ServiceState(in);
+            } catch (InvocationTargetException e) {
+                e.printStackTrace();
+                Rlog.e(LOG_TAG, "MtkServiceState InvocationTargetException! Used AOSP instead!");
+                sInstance = new ServiceState(in);
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+                Rlog.e(LOG_TAG, "MtkServiceState IllegalAccessException! Used AOSP instead!");
+                sInstance = new ServiceState(in);
+            } catch (Exception e) {
+                sInstance = new ServiceState(in);
+            }
+        } else {
+            sInstance = new ServiceState(in);
+        }
+        return sInstance;
+    }
+    // MTK-END
 }

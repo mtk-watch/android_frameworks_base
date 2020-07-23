@@ -96,6 +96,9 @@ import static com.android.internal.util.XmlUtils.writeBooleanAttribute;
 import static com.android.internal.util.XmlUtils.writeIntAttribute;
 import static com.android.internal.util.XmlUtils.writeLongAttribute;
 import static com.android.internal.util.XmlUtils.writeStringAttribute;
+import static com.android.internal.telephony.IccCardConstants.INTENT_VALUE_ICC_LOADED;
+import static com.android.internal.telephony.IccCardConstants.INTENT_KEY_ICC_STATE;
+import static com.android.internal.telephony.TelephonyIntents.ACTION_SIM_STATE_CHANGED;
 import static com.android.server.NetworkManagementService.LIMIT_GLOBAL_ALERT;
 import static com.android.server.net.NetworkPolicyLogger.NTWK_ALLOWED_DEFAULT;
 import static com.android.server.net.NetworkPolicyLogger.NTWK_ALLOWED_NON_METERED;
@@ -417,6 +420,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
     // See main javadoc for instructions on how to use these locks.
     final Object mUidRulesFirstLock = new Object();
     final Object mNetworkPoliciesSecondLock = new Object();
+    final Object mNetworkPoliciesReplicaSecondLock = new Object();
 
     @GuardedBy({"mUidRulesFirstLock", "mNetworkPoliciesSecondLock"})
     volatile boolean mSystemReady;
@@ -512,6 +516,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
     /** Set of ifaces that are metered. */
     @GuardedBy("mNetworkPoliciesSecondLock")
     private ArraySet<String> mMeteredIfaces = new ArraySet<>();
+    private ArraySet<String> mMeteredIfacesReplica = new ArraySet<>();
     /** Set of over-limit templates that have been notified. */
     @GuardedBy("mNetworkPoliciesSecondLock")
     private final ArraySet<NetworkTemplate> mOverLimitNotified = new ArraySet<>();
@@ -864,6 +869,13 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                     ACTION_CARRIER_CONFIG_CHANGED);
             mContext.registerReceiver(mCarrierConfigReceiver, carrierConfigFilter, null, mHandler);
 
+            // M { ALPS04413692 due to MTK telephony modify, subscriberId maybe null
+            final IntentFilter simStateChangedFilter = new IntentFilter(
+                    ACTION_SIM_STATE_CHANGED);
+            mContext.registerReceiver(mSimStateChangedReceiver, simStateChangedFilter,
+                                      null, mHandler);
+            // end
+
             // listen for meteredness changes
             mContext.getSystemService(ConnectivityManager.class).registerNetworkCallback(
                     new NetworkRequest.Builder().build(), mNetworkCallback);
@@ -1110,6 +1122,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                 if (meteredChanged || roamingChanged) {
                     mLogger.meterednessChanged(network.netId, newMetered);
                     updateNetworkRulesNL();
+                    syncMeteredIfacesToReplicaNL();
                 }
             }
         }
@@ -1496,6 +1509,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                 updateNetworkEnabledNL();
                 updateNetworkRulesNL();
                 updateNotificationsNL();
+                syncMeteredIfacesToReplicaNL();
             }
         }
     }
@@ -1657,13 +1671,29 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                         ensureActiveMobilePolicyAL(subId, subscriberId);
                         maybeUpdateMobilePolicyCycleAL(subId, subscriberId);
                     } else {
-                        Slog.wtf(TAG, "Missing subscriberId for subId " + subId);
+                        //ALPS04413692 due to MTK telephony modify, subscriberId maybe null
+                        Slog.w(TAG, "Missing subscriberId for subId " + subId);
                     }
 
                     // update network and notification rules, as the data cycle changed and it's
                     // possible that we should be triggering warnings/limits now
                     handleNetworkPoliciesUpdateAL(true);
                 }
+            }
+        }
+    };
+
+    /**
+     * ALPS04413692 due to MTK telephony modify, subscriberId maybe null
+     * Update subscriberId
+     */
+    private BroadcastReceiver mSimStateChangedReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String stateExtra=intent.getStringExtra(INTENT_KEY_ICC_STATE);
+            if (INTENT_VALUE_ICC_LOADED.equals(stateExtra)) {
+                Slog.i(TAG, "INTENT_VALUE_ICC_LOADED");
+                mCarrierConfigReceiver.onReceive(context, intent);
             }
         }
     };
@@ -1684,6 +1714,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         updateNetworkRulesNL();
         updateNotificationsNL();
         writePolicyAL();
+        syncMeteredIfacesToReplicaNL();
     }
 
     /**
@@ -1809,7 +1840,8 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
             if (!TextUtils.isEmpty(subscriberId)) {
                 subIdToSubscriberId.put(subId, subscriberId);
             } else {
-                Slog.wtf(TAG, "Missing subscriberId for subId " + subId);
+                //ALPS04413692 due to MTK telephony modify, subscriberId maybe null
+                Slog.w(TAG, "Missing subscriberId for subId " + subId);
             }
         }
 
@@ -3840,6 +3872,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
             if (restrictedNetworksChanged) {
                 normalizePoliciesNL();
                 updateNetworkRulesNL();
+                syncMeteredIfacesToReplicaNL();
             }
         } finally {
             Trace.traceEnd(Trace.TRACE_TAG_NETWORK);
@@ -5089,8 +5122,13 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                 isBackgroundRestricted = mRestrictBackground;
             }
             final boolean isNetworkMetered;
-            synchronized (mNetworkPoliciesSecondLock) {
-                isNetworkMetered = mMeteredIfaces.contains(ifname);
+            // M: Avoid flooding request from apps exhaust system server binder,
+            // then block phone process and finally block system server and cause SWT
+            //synchronized (mNetworkPoliciesSecondLock) {
+            //    isNetworkMetered = mMeteredIfaces.contains(ifname);
+            //}
+            synchronized (mNetworkPoliciesReplicaSecondLock) {
+                isNetworkMetered = mMeteredIfacesReplica.contains(ifname);
             }
             final boolean ret = isUidNetworkingBlockedInternal(uid, uidRules, isNetworkMetered,
                     isBackgroundRestricted, mLogger);
@@ -5170,6 +5208,18 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         public void setMeteredRestrictedPackagesAsync(Set<String> packageNames, int userId) {
             mHandler.obtainMessage(MSG_METERED_RESTRICTED_PACKAGES_CHANGED,
                     userId, 0, packageNames).sendToTarget();
+        }
+    }
+
+    private void syncMeteredIfacesToReplicaNL() {
+        if(mMeteredIfaces.equals(mMeteredIfacesReplica))
+        {
+            //Same content, ignore.
+            return;
+        }
+        synchronized (mNetworkPoliciesReplicaSecondLock) {
+            mMeteredIfacesReplica.clear();
+            mMeteredIfacesReplica.addAll(mMeteredIfaces);
         }
     }
 

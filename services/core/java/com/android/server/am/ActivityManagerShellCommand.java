@@ -151,6 +151,9 @@ final class ActivityManagerShellCommand extends ShellCommand {
 
     final boolean mDumping;
 
+    private static final boolean sPREF_PLUS
+            = SystemProperties.get("ro.vendor.mtk_perf_plus").equals("1");
+
     ActivityManagerShellCommand(ActivityManagerService service, boolean dumping) {
         mInterface = service;
         mTaskInterface = service.mActivityTaskManager;
@@ -446,6 +449,19 @@ final class ActivityManagerShellCommand extends ShellCommand {
                     }
                     packageName = activities.get(0).activityInfo.packageName;
                 }
+
+                // Return home, for ensure life-cycle integrity
+                try {
+                    mInternal.mAtmInternal.startHomeActivity(UserHandle.USER_OWNER, "goHome");
+                } catch (SecurityException e) {
+                } catch (IllegalStateException e1) {
+                }
+
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                }
+
                 pw.println("Stopping: " + packageName);
                 pw.flush();
                 mInterface.forceStopPackage(packageName, mUserId);
@@ -468,6 +484,16 @@ final class ActivityManagerShellCommand extends ShellCommand {
                 profilerInfo = new ProfilerInfo(mProfileFile, fd, mSamplingInterval, mAutoStop,
                         mStreaming, mAgent, mAttachAgentDuringBind);
             }
+
+            // Turn off animation
+            float[] oldAnims = null;
+
+            if (sPREF_PLUS) {
+                oldAnims = mInternal.mWindowManager.getAnimationScales();
+                mInternal.mWindowManager.setAnimationScale(0, 0.0f);
+                mInternal.mWindowManager.setAnimationScale(1, 0.0f);
+                mInternal.mWindowManager.setAnimationScale(2, 0.0f);
+            }//End turn off animation
 
             pw.println("Starting: " + intent);
             pw.flush();
@@ -519,6 +545,12 @@ final class ActivityManagerShellCommand extends ShellCommand {
                         null, null, 0, mStartFlags, profilerInfo,
                         options != null ? options.toBundle() : null, mUserId);
             }
+
+            // Turn on animation
+            if (sPREF_PLUS) {
+                mInternal.mWindowManager.setAnimationScales(oldAnims);
+            }//End turn on animation
+
             final long endTime = SystemClock.uptimeMillis();
             PrintWriter out = mWaitOption ? pw : getErrPrintWriter();
             boolean launched = false;
@@ -676,6 +708,7 @@ final class ActivityManagerShellCommand extends ShellCommand {
     final static class IntentReceiver extends IIntentReceiver.Stub {
         private final PrintWriter mPw;
         private boolean mFinished = false;
+        private static final int WAIT_TIMEOUT = 60 * 1000;
 
         IntentReceiver(PrintWriter pw) {
             mPw = pw;
@@ -697,7 +730,13 @@ final class ActivityManagerShellCommand extends ShellCommand {
 
         public synchronized void waitForFinish() {
             try {
-                while (!mFinished) wait();
+                if (!mFinished) {
+                    wait(WAIT_TIMEOUT);
+                }
+                if (!mFinished) {
+                    mPw.println("Broadcast wait for finish timeout");
+                    mPw.flush();
+                }
             } catch (InterruptedException e) {
                 throw new IllegalStateException(e);
             }
@@ -1051,7 +1090,7 @@ final class ActivityManagerShellCommand extends ShellCommand {
         } catch (NumberFormatException e) {
             packageName = arg;
         }
-        mInterface.crashApplication(-1, pid, packageName, userId, "shell-induced crash");
+        mInterface.crashApplication(-1, pid, packageName, userId, "shell-induced crash", false);
         return 0;
     }
 

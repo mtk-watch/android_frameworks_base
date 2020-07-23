@@ -887,6 +887,14 @@ class Linker {
           // android:versionCode from the framework AndroidManifest.xml.
           ExtractCompileSdkVersions(asset_source->GetAssetManager());
         }
+      ///M: To support mediatek framework resources @{
+      }else if (entry.first == kMtkFrameworkPackageId) {
+          std::unique_ptr<SymbolTable::Symbol> symbol = asset_source->FindByName(
+              ResourceName("com.mediatek", ResourceType::kAttr, "compileSdkVersion"));
+          if (symbol != nullptr && symbol->is_public) {
+            ExtractCompileSdkVersions(asset_source->GetAssetManager());
+          }
+        ///M: @}
       } else if (asset_source->IsPackageDynamic(entry.first)) {
         final_table_.included_packages_[entry.first] = entry.second;
       }
@@ -1610,6 +1618,8 @@ class Linker {
     // definition of what a valid "split" package ID is to account for this.
     const bool isSplitPackage = (options_.allow_reserved_package_id &&
           context_->GetPackageId() != kAppPackageId &&
+          ///M: To support mediatek framework resouces.
+          context_->GetPackageId() != kMtkFrameworkPackageId &&
           context_->GetPackageId() != kFrameworkPackageId)
         || (!options_.allow_reserved_package_id && context_->GetPackageId() > kAppPackageId);
     if (isSplitPackage &&
@@ -1700,6 +1710,18 @@ class Linker {
       }
     }
 
+    /// M: Override the package ID when it is "com.mediatek" @{
+    if (context_->GetCompilationPackage() == "com.mediatek") {
+      context_->SetPackageId(kMtkFrameworkPackageId);
+
+      // Verify we're building a regular app.
+      if (context_->GetPackageType() != PackageType::kApp) {
+        context_->GetDiagnostics()->Error(
+            DiagMessage() << "package 'com.mediatek' can only be built as a regular app");
+        return 1;
+      }
+    }
+    ///M: @}
     TableMergerOptions table_merger_options;
     table_merger_options.auto_add_overlay = options_.auto_add_overlay;
     table_merger_options.strict_visibility = options_.strict_visibility;
@@ -2133,6 +2155,8 @@ int LinkCommand::Action(const std::vector<std::string>& args) {
     const uint32_t package_id_int = maybe_package_id_int.value();
     if (package_id_int > std::numeric_limits<uint8_t>::max()
         || package_id_int == kFrameworkPackageId
+        ///M: To support mediatek framework resouces.
+        || package_id_int == kMtkFrameworkPackageId
         || (!options_.allow_reserved_package_id && package_id_int < kAppPackageId)) {
       context.GetDiagnostics()->Error(
           DiagMessage() << StringPrintf(

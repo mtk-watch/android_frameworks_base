@@ -35,8 +35,11 @@ import static com.android.internal.util.Preconditions.*;
  */
 public class GLThreadManager {
     private final String TAG;
-    private static final boolean DEBUG = false;
-
+    //!++
+    private static final boolean DEBUG = ParameterUtils.DEBUG;
+    private static final int GL_THREAD_TIMEOUT = 2000; //ms
+    private static final int STATE_CONFIGURING = 2;
+    //!--
     private static final int MSG_NEW_CONFIGURATION = 1;
     private static final int MSG_NEW_FRAME = 2;
     private static final int MSG_CLEANUP = 3;
@@ -102,6 +105,10 @@ public class GLThreadManager {
                         if (!mConfigured) {
                             Log.e(TAG, "Dropping frame, EGL context not configured!");
                         }
+                        if (mDeviceState.getCurrentState() == STATE_CONFIGURING) {
+                            Log.e(TAG, "Current device state is configring!");
+                            break;
+                        }
                         mTextureRenderer.drawIntoSurfaces(mCaptureCollector);
                         break;
                     case MSG_CLEANUP:
@@ -125,6 +132,12 @@ public class GLThreadManager {
             } catch (Exception e) {
                 Log.e(TAG, "Received exception on GL render thread: ", e);
                 mDeviceState.setError(CameraDeviceImpl.CameraDeviceCallbacks.ERROR_CAMERA_DEVICE);
+                if(MSG_NEW_CONFIGURATION == msg.what) {
+                    ConfigureHolder configure = (ConfigureHolder) msg.obj;
+                    if(configure != null) {
+                        configure.condition.open();
+                    }
+                }
             }
             return true;
         }
@@ -174,7 +187,7 @@ public class GLThreadManager {
         handler.sendMessageAtFrontOfQueue(handler.obtainMessage(MSG_CLEANUP));
         mGLHandlerThread.quitSafely();
         try {
-            mGLHandlerThread.join();
+            mGLHandlerThread.join(GL_THREAD_TIMEOUT);
         } catch (InterruptedException e) {
             Log.e(TAG, String.format("Thread %s (%d) interrupted while quitting.",
                     mGLHandlerThread.getName(), mGLHandlerThread.getId()));

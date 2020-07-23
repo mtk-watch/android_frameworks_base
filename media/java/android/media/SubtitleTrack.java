@@ -23,7 +23,8 @@ import android.os.Handler;
 import android.util.Log;
 import android.util.LongSparseArray;
 import android.util.Pair;
-
+import android.os.SystemProperties;
+import android.os.Build;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.SortedMap;
@@ -56,7 +57,7 @@ public abstract class SubtitleTrack implements MediaTimeProvider.OnMediaTimeList
     protected boolean mVisible;
 
     /** @hide */
-    public boolean DEBUG = false;
+    public boolean DEBUG = !"user".equals(Build.TYPE);
 
     /** @hide */
     protected Handler mHandler = new Handler();

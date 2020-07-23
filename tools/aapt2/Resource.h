@@ -127,6 +127,8 @@ struct ResourceNameRef {
 
 constexpr const uint8_t kAppPackageId = 0x7fu;
 constexpr const uint8_t kFrameworkPackageId = 0x01u;
+///M: To support mediatek framework resouces.
+constexpr const uint8_t kMtkFrameworkPackageId = 0x08u;
 
 /**
  * A binary identifier representing a resource. Internally it

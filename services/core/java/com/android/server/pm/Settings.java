@@ -95,6 +95,9 @@ import com.android.server.pm.permission.PermissionSettings;
 import com.android.server.pm.permission.PermissionsState;
 import com.android.server.pm.permission.PermissionsState.PermissionState;
 
+import com.mediatek.server.pm.PmsExt;
+import com.mediatek.server.MtkSystemServiceFactory;
+
 import libcore.io.IoUtils;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -382,6 +385,9 @@ public final class Settings {
     /** Settings and other information about permissions */
     final PermissionSettings mPermissions;
 
+    //M: PMS enhance part
+    private static PmsExt sPmsExt = MtkSystemServiceFactory.getInstance().makePmsExt();
+
     Settings(File dataDir, PermissionSettings permission,
             Object lock) {
         mLock = lock;
@@ -463,7 +469,9 @@ public final class Settings {
         }
         final PackageSetting dp = mDisabledSysPackages.get(name);
         // always make sure the system package code and resource paths dont change
-        if (dp == null && p.pkg != null && p.pkg.isSystem() && !p.pkg.isUpdatedSystemApp()) {
+        if (dp == null && p.pkg != null && ((p.pkg.isSystem() && !p.pkg.isUpdatedSystemApp())
+                // M:operator app also is removable and not system flag
+                || sPmsExt.isRemovableSysApp(name))) {
             if((p.pkg != null) && (p.pkg.applicationInfo != null)) {
                 p.pkg.applicationInfo.flags |= ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
             }
@@ -1252,6 +1260,7 @@ public final class Settings {
             return false;
         }
         ps.clearDomainVerificationStatusForUser(userId);
+        ps.setIntentFilterVerificationInfo(null);
         return true;
     }
 
@@ -3337,7 +3346,8 @@ public final class Settings {
             int flags, ComponentName cn, String scheme, PatternMatcher ssp,
             IntentFilter.AuthorityEntry auth, PatternMatcher path, int userId) {
         final List<ResolveInfo> ri =
-                pmInternal.queryIntentActivities(intent, flags, Binder.getCallingUid(), 0);
+                pmInternal.queryIntentActivities(
+                        intent, intent.getType(), flags, Binder.getCallingUid(), 0);
         if (PackageManagerService.DEBUG_PREFERRED) {
             Log.d(TAG, "Queried " + intent + " results: " + ri);
         }

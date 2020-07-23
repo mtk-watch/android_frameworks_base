@@ -61,6 +61,10 @@ import com.android.server.policy.GlobalActionsProvider;
 import com.android.server.power.ShutdownThread;
 import com.android.server.wm.WindowManagerService;
 
+/// M: Privacy protected lock support
+import com.mediatek.server.ppl.MtkPplManager;
+import com.mediatek.server.MtkSystemServiceFactory;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -108,6 +112,11 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         }
 
     }
+
+    /// M: Privacy protected lock support @{
+    public MtkPplManager mMtkPplManager
+            = MtkSystemServiceFactory.getInstance().makeMtkPplManager();
+    /// @}
 
     private class DisableRecord implements IBinder.DeathRecipient {
         int userId;
@@ -180,6 +189,9 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
 
         LocalServices.addService(StatusBarManagerInternal.class, mInternalService);
         LocalServices.addService(GlobalActionsProvider.class, mGlobalActionsProvider);
+
+        /// M: Privacy protected lock support
+        mMtkPplManager.registerPplReceiver(mContext);
 
         // We always have a default display.
         final UiState state = new UiState();

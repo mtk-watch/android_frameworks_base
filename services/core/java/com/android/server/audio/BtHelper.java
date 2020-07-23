@@ -245,11 +245,17 @@ public class BtHelper {
         final String action = intent.getAction();
         if (action.equals(BluetoothHeadset.ACTION_ACTIVE_DEVICE_CHANGED)) {
             BluetoothDevice btDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+            if (AudioService.DEBUG_DEVICES) {
+                Log.d(TAG, "receiveBtEvent() BTactiveDeviceChanged" +  "btDevice=" + btDevice);
+            }
             setBtScoActiveDevice(btDevice);
         } else if (action.equals(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)) {
             boolean broadcast = false;
             int scoAudioState = AudioManager.SCO_AUDIO_STATE_ERROR;
             int btState = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1);
+            if (AudioService.DEBUG_DEVICES) {
+                Log.d(TAG, "receiveBtEvent() AudioStateChanged" +  "btState=" + btState);
+            }
             // broadcast intent if the connection was initated by AudioService
             if (!mScoClients.isEmpty()
                     && (mScoAudioState == SCO_STATE_ACTIVE_INTERNAL
@@ -299,6 +305,10 @@ public class BtHelper {
                 broadcastScoConnectionState(scoAudioState);
                 //FIXME: this is to maintain compatibility with deprecated intent
                 // AudioManager.ACTION_SCO_AUDIO_STATE_CHANGED. Remove when appropriate.
+                if (AudioService.DEBUG_DEVICES) {
+                    Log.d(TAG, "receiveBtEvent(): BR SCOAudioStateChanged"
+                        +  ", scoAudioState=" + scoAudioState);
+                }
                 Intent newIntent = new Intent(AudioManager.ACTION_SCO_AUDIO_STATE_CHANGED);
                 newIntent.putExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, scoAudioState);
                 sendStickyBroadcastToAll(newIntent);
@@ -687,16 +697,26 @@ public class BtHelper {
                         + scoAudioMode + ") failed");
                 return;
             }
-            if (mStartcount == 0) {
-                try {
-                    mCb.linkToDeath(this, 0);
-                } catch (RemoteException e) {
-                    // client has already died!
-                    Log.w(TAG, "ScoClient  incCount() could not link to "
-                            + mCb + " binder death");
+            // ALPS04692651 mStartCount should always be either 0 or 1 only.
+            // If the startBluetoothSco API
+            // is called more than once by mistake, by any application. This will ensure that
+            //SCO gets disconnected when app calls stopBluetoothSco only once.
+            //Also, if SCO is already there, we just need to select the SCO devices by
+            //calling setBluetoothScoOn(true) in system context.
+            if (mStartcount == 1) {
+                Log.i(TAG, "mStartcount is 1, calling mDeviceBroker.setBluetoothScoOn(true)"
+                            + "in system context");
+                mDeviceBroker.setBluetoothScoOn(true, "BtHelper.receiveBtEvent");
+            } else if (mStartcount == 0) {
+                    try {
+                        mCb.linkToDeath(this, 0);
+                    } catch (RemoteException e) {
+                        // client has already died!
+                        Log.w(TAG, "ScoClient  incCount() could not link to "
+                                + mCb + " binder death");
+                    }
+                    mStartcount++;
                 }
-            }
-            mStartcount++;
         }
 
         // @GuardedBy("AudioDeviceBroker.mSetModeLock")

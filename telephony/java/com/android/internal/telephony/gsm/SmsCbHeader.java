@@ -15,11 +15,17 @@
  */
 
 package com.android.internal.telephony.gsm;
-
+// MTK_START: Revise for telephony add on
+import android.os.SystemProperties;
+// MTK-END
 import android.telephony.SmsCbCmasInfo;
 import android.telephony.SmsCbEtwsInfo;
 
 import java.util.Arrays;
+
+// MTK_START: Revise for telephony add on
+import java.lang.reflect.Constructor;
+// MTK-END
 
 /**
  * Parses a 3GPP TS 23.041 cell broadcast message header. This class is public for use by
@@ -36,59 +42,64 @@ public class SmsCbHeader {
     /**
      * Length of SMS-CB header
      */
-    static final int PDU_HEADER_LENGTH = 6;
+    // MTK-START
+    // Modification for sub class
+    public static final int PDU_HEADER_LENGTH = 6;
 
     /**
      * GSM pdu format, as defined in 3gpp TS 23.041, section 9.4.1
      */
-    static final int FORMAT_GSM = 1;
+    protected static final int FORMAT_GSM = 1;
 
     /**
      * UMTS pdu format, as defined in 3gpp TS 23.041, section 9.4.2
      */
-    static final int FORMAT_UMTS = 2;
+    protected static final int FORMAT_UMTS = 2;
 
     /**
      * GSM pdu format, as defined in 3gpp TS 23.041, section 9.4.1.3
      */
-    static final int FORMAT_ETWS_PRIMARY = 3;
+    protected static final int FORMAT_ETWS_PRIMARY = 3;
 
     /**
      * Message type value as defined in 3gpp TS 25.324, section 11.1.
      */
-    private static final int MESSAGE_TYPE_CBS_MESSAGE = 1;
+    protected static final int MESSAGE_TYPE_CBS_MESSAGE = 1;
 
     /**
      * Length of GSM pdus
      */
-    private static final int PDU_LENGTH_GSM = 88;
+    protected static final int PDU_LENGTH_GSM = 88;
 
     /**
      * Maximum length of ETWS primary message GSM pdus
      */
-    private static final int PDU_LENGTH_ETWS = 56;
+    protected static final int PDU_LENGTH_ETWS = 56;
 
-    private final int mGeographicalScope;
+    // Remove "final" for sub class - [Start]
+    protected int mGeographicalScope;
 
     /** The serial number combines geographical scope, message code, and update number. */
-    private final int mSerialNumber;
+    protected int mSerialNumber;
 
     /** The Message Identifier in 3GPP is the same as the Service Category in CDMA. */
-    private final int mMessageIdentifier;
+    protected int mMessageIdentifier;
 
-    private final int mDataCodingScheme;
+    protected int mDataCodingScheme;
 
-    private final int mPageIndex;
+    protected int mPageIndex;
 
-    private final int mNrOfPages;
+    protected int mNrOfPages;
 
-    private final int mFormat;
+    protected int mFormat;
 
     /** ETWS warning notification info. */
-    private final SmsCbEtwsInfo mEtwsInfo;
+    protected SmsCbEtwsInfo mEtwsInfo;
 
     /** CMAS warning notification info. */
-    private final SmsCbCmasInfo mCmasInfo;
+    protected SmsCbCmasInfo mCmasInfo;
+    // Remove "final" for sub class - [End]
+    // MTK-END
 
     public SmsCbHeader(byte[] pdu) throws IllegalArgumentException {
         if (pdu == null || pdu.length < PDU_HEADER_LENGTH) {
@@ -175,51 +186,63 @@ public class SmsCbHeader {
             int urgency = getCmasUrgency();
             int certainty = getCmasCertainty();
             mEtwsInfo = null;
+            // MTK-START: Revise for telephony add on
+            /*
             mCmasInfo = new SmsCbCmasInfo(messageClass, SmsCbCmasInfo.CMAS_CATEGORY_UNKNOWN,
                     SmsCbCmasInfo.CMAS_RESPONSE_TYPE_UNKNOWN, severity, urgency, certainty);
+            */
+            mCmasInfo = makeSmsCbCmasInfo(messageClass, SmsCbCmasInfo.CMAS_CATEGORY_UNKNOWN,
+                    SmsCbCmasInfo.CMAS_RESPONSE_TYPE_UNKNOWN, severity, urgency, certainty);
+            // MTK-END
         } else {
             mEtwsInfo = null;
             mCmasInfo = null;
         }
     }
 
-    int getGeographicalScope() {
+    // MTK-START
+    // Modification for sub class
+    public int getGeographicalScope() {
         return mGeographicalScope;
     }
 
-    int getSerialNumber() {
+    public int getSerialNumber() {
         return mSerialNumber;
     }
 
-    int getServiceCategory() {
+    public int getServiceCategory() {
         return mMessageIdentifier;
     }
 
-    int getDataCodingScheme() {
+    public int getDataCodingScheme() {
         return mDataCodingScheme;
     }
 
-    int getPageIndex() {
+    public int getPageIndex() {
         return mPageIndex;
     }
 
-    int getNumberOfPages() {
+    public int getNumberOfPages() {
         return mNrOfPages;
     }
 
-    SmsCbEtwsInfo getEtwsInfo() {
+    public SmsCbEtwsInfo getEtwsInfo() {
         return mEtwsInfo;
     }
 
-    SmsCbCmasInfo getCmasInfo() {
+    public SmsCbCmasInfo getCmasInfo() {
         return mCmasInfo;
     }
+    // MTK-END
 
     /**
      * Return whether this broadcast is an emergency (PWS) message type.
      * @return true if this message is emergency type; false otherwise
      */
-    boolean isEmergencyMessage() {
+    // MTK-START
+    // Modification for sub class
+    protected boolean isEmergencyMessage() {
+    // MTK-END
         return mMessageIdentifier >= SmsCbConstants.MESSAGE_ID_PWS_FIRST_IDENTIFIER
                 && mMessageIdentifier <= SmsCbConstants.MESSAGE_ID_PWS_LAST_IDENTIFIER;
     }
@@ -228,7 +251,10 @@ public class SmsCbHeader {
      * Return whether this broadcast is an ETWS emergency message type.
      * @return true if this message is ETWS emergency type; false otherwise
      */
-    private boolean isEtwsMessage() {
+    // MTK-START
+    // Modification for sub class
+    protected boolean isEtwsMessage() {
+    // MTK-END
         return (mMessageIdentifier & SmsCbConstants.MESSAGE_ID_ETWS_TYPE_MASK)
                 == SmsCbConstants.MESSAGE_ID_ETWS_TYPE;
     }
@@ -237,7 +263,9 @@ public class SmsCbHeader {
      * Return whether this broadcast is an ETWS primary notification.
      * @return true if this message is an ETWS primary notification; false otherwise
      */
-    boolean isEtwsPrimaryNotification() {
+    // MTK-START
+    public boolean isEtwsPrimaryNotification() {
+    // MTK-END
         return mFormat == FORMAT_ETWS_PRIMARY;
     }
 
@@ -245,7 +273,9 @@ public class SmsCbHeader {
      * Return whether this broadcast is in UMTS format.
      * @return true if this message is in UMTS format; false otherwise
      */
-    boolean isUmtsFormat() {
+    // MTK-START
+    public boolean isUmtsFormat() {
+    // MTK-END
         return mFormat == FORMAT_UMTS;
     }
 
@@ -253,7 +283,10 @@ public class SmsCbHeader {
      * Return whether this message is a CMAS emergency message type.
      * @return true if this message is CMAS emergency type; false otherwise
      */
-    private boolean isCmasMessage() {
+    // MTK-START
+    // Modification for sub class
+    protected boolean isCmasMessage() {
+    // MTK-END
         return mMessageIdentifier >= SmsCbConstants.MESSAGE_ID_CMAS_FIRST_IDENTIFIER
                 && mMessageIdentifier <= SmsCbConstants.MESSAGE_ID_CMAS_LAST_IDENTIFIER;
     }
@@ -264,7 +297,10 @@ public class SmsCbHeader {
      *
      * @return true if the message code indicates a popup alert should be displayed
      */
-    private boolean isEtwsPopupAlert() {
+    // MTK-START
+    // Modification for sub class
+    protected boolean isEtwsPopupAlert() {
+    // MTK-END
         return (mSerialNumber & SmsCbConstants.SERIAL_NUMBER_ETWS_ACTIVATE_POPUP) != 0;
     }
 
@@ -274,7 +310,10 @@ public class SmsCbHeader {
      *
      * @return true if the message code indicates an emergency user alert
      */
-    private boolean isEtwsEmergencyUserAlert() {
+    // MTK-START
+    // Modification for sub class
+    protected boolean isEtwsEmergencyUserAlert() {
+    // MTK-END
         return (mSerialNumber & SmsCbConstants.SERIAL_NUMBER_ETWS_EMERGENCY_USER_ALERT) != 0;
     }
 
@@ -284,7 +323,10 @@ public class SmsCbHeader {
      *
      * @return the ETWS warning type defined in 3GPP TS 23.041 section 9.3.24
      */
-    private int getEtwsWarningType() {
+    // MTK-START
+    // Modification for sub class
+    protected int getEtwsWarningType() {
+    // MTK-END
         return mMessageIdentifier - SmsCbConstants.MESSAGE_ID_ETWS_EARTHQUAKE_WARNING;
     }
 
@@ -293,7 +335,10 @@ public class SmsCbHeader {
      * This method assumes that the message ID has already been checked for CMAS type.
      * @return the CMAS message class as defined in {@link SmsCbCmasInfo}
      */
-    private int getCmasMessageClass() {
+    // MTK-START
+    // Modification for sub class
+    protected int getCmasMessageClass() {
+    // MTK-END
         switch (mMessageIdentifier) {
             case SmsCbConstants.MESSAGE_ID_CMAS_ALERT_PRESIDENTIAL_LEVEL:
             case SmsCbConstants.MESSAGE_ID_CMAS_ALERT_PRESIDENTIAL_LEVEL_LANGUAGE:
@@ -346,7 +391,10 @@ public class SmsCbHeader {
      * This method assumes that the message ID has already been checked for CMAS type.
      * @return the CMAS severity as defined in {@link SmsCbCmasInfo}
      */
-    private int getCmasSeverity() {
+    // MTK-START
+    // Modification for sub class
+    protected int getCmasSeverity() {
+    // MTK-END
         switch (mMessageIdentifier) {
             case SmsCbConstants.MESSAGE_ID_CMAS_ALERT_EXTREME_IMMEDIATE_OBSERVED:
             case SmsCbConstants.MESSAGE_ID_CMAS_ALERT_EXTREME_IMMEDIATE_OBSERVED_LANGUAGE:
@@ -379,7 +427,10 @@ public class SmsCbHeader {
      * This method assumes that the message ID has already been checked for CMAS type.
      * @return the CMAS urgency as defined in {@link SmsCbCmasInfo}
      */
-    private int getCmasUrgency() {
+    // MTK-START
+    // Modification for sub class
+    protected int getCmasUrgency() {
+    // MTK-END
         switch (mMessageIdentifier) {
             case SmsCbConstants.MESSAGE_ID_CMAS_ALERT_EXTREME_IMMEDIATE_OBSERVED:
             case SmsCbConstants.MESSAGE_ID_CMAS_ALERT_EXTREME_IMMEDIATE_OBSERVED_LANGUAGE:
@@ -412,7 +463,10 @@ public class SmsCbHeader {
      * This method assumes that the message ID has already been checked for CMAS type.
      * @return the CMAS certainty as defined in {@link SmsCbCmasInfo}
      */
-    private int getCmasCertainty() {
+    // MTK-START
+    // Modification for sub class
+    protected int getCmasCertainty() {
+    // MTK-END
         switch (mMessageIdentifier) {
             case SmsCbConstants.MESSAGE_ID_CMAS_ALERT_EXTREME_IMMEDIATE_OBSERVED:
             case SmsCbConstants.MESSAGE_ID_CMAS_ALERT_EXTREME_IMMEDIATE_OBSERVED_LANGUAGE:
@@ -448,4 +502,33 @@ public class SmsCbHeader {
                 + ", DCS=0x" + Integer.toHexString(mDataCodingScheme)
                 + ", page " + mPageIndex + " of " + mNrOfPages + '}';
     }
+
+    // MTK-START: Revise for telephony add on
+    private SmsCbCmasInfo makeSmsCbCmasInfo(int messageClass, int category, int responseType,
+            int severity, int urgency, int certainty) {
+        if (SystemProperties.get("ro.vendor.mtk_telephony_add_on_policy", "0").equals("0")) {
+            try {
+                String className = "mediatek.telephony.MtkSmsCbCmasInfo";
+                Class<?> clazz = Class.forName(className);
+                Class classes[] = {int.class, int.class,
+                        int.class, int.class, int.class, int.class, long.class};
+                Constructor clazzConstructfunc = clazz.getConstructor(classes);
+                return (SmsCbCmasInfo) clazzConstructfunc.newInstance(messageClass, category,
+                        responseType, severity, urgency, certainty, 0L);
+            } catch (Exception e) {
+                return new SmsCbCmasInfo(messageClass, category, responseType,
+                        severity, urgency, certainty);
+            }
+        } else {
+            return new SmsCbCmasInfo(messageClass, category, responseType,
+                    severity, urgency, certainty);
+        }
+    }
+    // MTK-END
+
+    // MTK-START
+    // Added for sub class
+    public SmsCbHeader() {
+    }
+    // MTK-END
 }

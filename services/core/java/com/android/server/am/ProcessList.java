@@ -100,6 +100,9 @@ import com.android.server.pm.dex.DexManager;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 import com.android.server.wm.WindowManagerService;
 
+/// M: MtkSystemServer
+import com.mediatek.server.MtkSystemServer;
+
 import dalvik.system.VMRuntime;
 
 import libcore.io.IoUtils;
@@ -191,7 +194,7 @@ public final class ProcessList {
     // This is a process only hosting components that are perceptible to the
     // user, and we really want to avoid killing them, but they are not
     // immediately visible. An example is background music playback.
-    static final int PERCEPTIBLE_APP_ADJ = 200;
+    public static final int PERCEPTIBLE_APP_ADJ = 200;
 
     // This is a process only hosting activities that are visible to the
     // user, so we'd prefer they don't disappear.
@@ -1329,7 +1332,7 @@ public final class ProcessList {
             final int procCount = procs.size();
             for (int i = 0; i < procCount; i++) {
                 final int procUid = procs.keyAt(i);
-                if (UserHandle.isApp(procUid) || !UserHandle.isSameUser(procUid, uid)) {
+                if (!UserHandle.isCore(procUid) || !UserHandle.isSameUser(procUid, uid)) {
                     // Don't use an app process or different user process for system component.
                     continue;
                 }
@@ -1449,6 +1452,10 @@ public final class ProcessList {
         checkSlow(startTime, "startProcess: starting to update cpu stats");
         mService.updateCpuStats();
         checkSlow(startTime, "startProcess: done updating cpu stats");
+
+        /// M: onStartProcess @{
+        mService.mAmsExt.onStartProcess(hostingRecord.getType(), app.info.packageName);
+        /// M: onStartProcess @}
 
         try {
             try {
@@ -1642,6 +1649,13 @@ public final class ProcessList {
             ProcessRecord app, int uid, int[] gids, int runtimeFlags, int mountExternal,
             String seInfo, String requiredAbi, String instructionSet, String invokeWith,
             long startTime) {
+      /// M: CTA requirement
+        if (!mService.mAmsExt.checkAutoBootPermission(mService.mContext, app.processName,
+                app.userId, mLruProcesses, mService.mCallingPid)) {
+            mService.mCallingPid = 0;
+            return true;
+        }
+
         app.pendingStart = true;
         app.killedByAm = false;
         app.removed = false;
@@ -2020,6 +2034,15 @@ public final class ProcessList {
         } catch (RemoteException ex) {
             // Ignore
         }
+
+        /// M: Boot time profiling @{
+        mService.sMtkSystemServerIns.addBootEvent("AP_Init:["
+            + app.hostingRecord.getType()
+            + "]:[" + app.processName
+            + ((app.hostingRecord.getName() != null) ? "]:[" + app.hostingRecord.getName() : "")
+            + "]:pid:" + pid
+            + (app.isPersistent() ? ":(PersistAP)" : ""));
+        /// M: @}
 
         if (app.isPersistent()) {
             Watchdog.getInstance().processStarted(app.processName, pid);

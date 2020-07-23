@@ -169,6 +169,13 @@ import com.android.org.conscrypt.OpenSSLSocketImpl;
 import com.android.org.conscrypt.TrustedCertificateStore;
 import com.android.server.am.MemInfoDumpProto;
 
+/// M: ANR Debug Mechanism
+import com.mediatek.anr.AnrAppFactory;
+import com.mediatek.anr.AnrAppManager;
+
+/// M: Dynamically enable ActivityThread log
+import com.mediatek.app.ActivityThreadExt;
+
 import dalvik.system.CloseGuard;
 import dalvik.system.VMDebug;
 import dalvik.system.VMRuntime;
@@ -220,17 +227,19 @@ public final class ActivityThread extends ClientTransactionHandler {
     /** @hide */
     public static final String TAG = "ActivityThread";
     private static final android.graphics.Bitmap.Config THUMBNAIL_FORMAT = Bitmap.Config.RGB_565;
-    static final boolean localLOGV = false;
-    static final boolean DEBUG_MESSAGES = false;
+    /// M: Dynamically enable AMS logs @{
+    public static boolean localLOGV = false;
+    public static boolean DEBUG_MESSAGES = false;
     /** @hide */
-    public static final boolean DEBUG_BROADCAST = false;
-    private static final boolean DEBUG_RESULTS = false;
-    private static final boolean DEBUG_BACKUP = false;
-    public static final boolean DEBUG_CONFIGURATION = false;
-    private static final boolean DEBUG_SERVICE = false;
-    public static final boolean DEBUG_MEMORY_TRIM = false;
-    private static final boolean DEBUG_PROVIDER = false;
-    public static final boolean DEBUG_ORDER = false;
+    public static boolean DEBUG_BROADCAST = false;
+    public static boolean DEBUG_RESULTS = false;
+    public static boolean DEBUG_BACKUP = false;
+    public static boolean DEBUG_CONFIGURATION = false;
+    public static boolean DEBUG_SERVICE = false;
+    public static boolean DEBUG_MEMORY_TRIM = false;
+    public static boolean DEBUG_PROVIDER = false;
+    public static boolean DEBUG_ORDER = false;
+    /// M: Dynamically enable AMS logs @}
     private static final long MIN_TIME_BETWEEN_GCS = 5*1000;
     /**
      * If the activity doesn't become idle in time, the timeout will ensure to apply the pending top
@@ -270,6 +279,10 @@ public final class ActivityThread extends ClientTransactionHandler {
      * as one of the arguments when the process starts.
      */
     public static final String PROC_START_SEQ_IDENT = "seq=";
+
+    /// M: ANR Debug Mechanism
+    private static AnrAppManager mAnrAppManager =
+            AnrAppFactory.getInstance().makeAnrAppManager();
 
     private final Object mNetworkPolicyLock = new Object();
 
@@ -1666,6 +1679,18 @@ public final class ActivityThread extends ClientTransactionHandler {
             ActivityThread.this.scheduleTransaction(transaction);
         }
 
+        /// M: ANR Debug Mechanism @{
+        public void dumpMessage(boolean dumpAll) {
+            mAnrAppManager.dumpMessage(dumpAll);
+        } /// @}
+
+       /// M: Dynamically enable ActivityThread logs @{
+        @Override
+        public void enableActivityThreadLog(boolean isEnable) {
+            ActivityThreadExt.enableActivityThreadLog(isEnable, ActivityThread.this);
+        }
+        /// M: Dynamically enable ActivityThread logs @}
+
         @Override
         public void requestDirectActions(@NonNull IBinder activityToken,
                 @NonNull IVoiceInteractor interactor, @Nullable RemoteCallback cancellationCallback,
@@ -2343,6 +2368,9 @@ public final class ActivityThread extends ClientTransactionHandler {
 
     @UnsupportedAppUsage
     ActivityThread() {
+        /// M: Dynamically enable ActivityThread logs @{
+        ActivityThreadExt.enableActivityThreadLog(this);
+        /// M: Dynamically enable ActivityThread logs @}
         mResourcesManager = ResourcesManager.getInstance();
     }
 
@@ -7353,6 +7381,8 @@ public final class ActivityThread extends ClientTransactionHandler {
 
         // End of event ActivityThreadMain.
         Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+        /// M: ANR Debug Mechanism
+        mAnrAppManager.setMessageLogger(Looper.myLooper());
         Looper.loop();
 
         throw new RuntimeException("Main thread loop unexpectedly exited");

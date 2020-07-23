@@ -4323,4 +4323,32 @@ public class ActivityManager {
             }
         }
     }
+
+    /// M: App-based AAL @{
+    /**
+     * Set AAL mode.
+     *
+     * @hide
+     */
+    public void setAalMode(int mode) {
+        try {
+            getService().setAalMode(mode);
+        } catch (RemoteException e) {
+            // System dead, we will be dead too soon!
+        }
+    }
+
+    /**
+     * Enable/Disable App-based AAL.
+     *
+     * @hide
+     */
+    public void setAalEnabled(boolean enabled) {
+        try {
+            getService().setAalEnabled(enabled);
+        } catch (RemoteException e) {
+            // System dead, we will be dead too soon!
+        }
+    }
+    /// @}
 }

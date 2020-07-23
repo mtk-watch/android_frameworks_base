@@ -37,6 +37,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
+import android.os.Build;
 import android.util.ArrayMap;
 import android.util.Log;
 import android.util.Pair;
@@ -75,7 +76,7 @@ import java.util.List;
  */
 public abstract class MediaBrowserService extends Service {
     private static final String TAG = "MediaBrowserService";
-    private static final boolean DBG = false;
+    private static final boolean DBG = !"user".equals(Build.TYPE);
 
     /**
      * The {@link Intent} that must be declared as handled by the service.

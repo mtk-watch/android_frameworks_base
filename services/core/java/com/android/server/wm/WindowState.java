@@ -213,7 +213,8 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /** A window in the window manager. */
-class WindowState extends WindowContainer<WindowState> implements WindowManagerPolicy.WindowState {
+public class WindowState extends WindowContainer<WindowState> implements
+    WindowManagerPolicy.WindowState {
     static final String TAG = TAG_WITH_CLASS_NAME ? "WindowState" : TAG_WM;
 
     // The minimal size of a window within the usable area of the freeform stack.
@@ -270,7 +271,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     /**
      * The Bitwise-or of flags that contribute to visibility of the WindowState
      */
-    private int mPolicyVisibility = POLICY_VISIBILITY_ALL;
+    public int mPolicyVisibility = POLICY_VISIBILITY_ALL;
 
     /**
      * Whether {@link #LEGACY_POLICY_VISIBILITY} flag should be set after a transition animation.
@@ -566,6 +567,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     private boolean mDrawnStateEvaluated;
 
     private final Point mSurfacePosition = new Point();
+
+    /// M: Add for App Resolution Tuner @{
+    public boolean mNeedHWResizer= false;
+    public float mHWScale = mGlobalScale;
+    /// @}
 
     /**
      * A region inside of this window to be excluded from touch.
@@ -1064,7 +1070,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mWindowFrames.offsetFrames(-layoutXDiff, -layoutYDiff);
 
         mWindowFrames.mCompatFrame.set(mWindowFrames.mFrame);
-        if (inSizeCompatMode()) {
+        if (inSizeCompatMode() || mNeedHWResizer) {
             // If there is a size compatibility scale being applied to the
             // window, we need to apply this to its insets so that they are
             // reported to the app in its coordinate space.
@@ -1259,7 +1265,10 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                         + " surfaceResized=" + winAnimator.mSurfaceResized
                         + " configChanged=" + configChanged
                         + " dragResizingChanged=" + dragResizingChanged
-                        + " reportOrientationChanged=" + mReportOrientationChanged);
+                        + " reportOrientationChanged=" + mReportOrientationChanged
+                       /// M: Add more log at WMS
+                        + " contentInsets=" + getContentInsets()
+                        + " visibleInsets=" + getVisibleInsets());
             }
 
             // If it's a dead window left on screen, and the configuration changed, there is nothing
@@ -1423,6 +1432,17 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     void prelayout() {
+
+        /// M: Add for App Resolution Tuner @{
+        if (mNeedHWResizer) {
+            mGlobalScale = mHWScale;
+            mInvGlobalScale = 1 / mGlobalScale;
+            Slog.v("AppResolutionTuner","windowstate prelayout() Need HWResizer, mGlobalScale = "
+                  + mGlobalScale + " , this = " + this);
+            return;
+        }
+        /// @}
+
         if (inSizeCompatMode()) {
             mGlobalScale = mToken.getSizeCompatScale();
             mInvGlobalScale = 1 / mGlobalScale;
@@ -2042,7 +2062,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                         mAppToken.updateReportedVisibilityLocked();
                     }
                     return;
+                /// M: if don't start animation, set it as false.
+                } else {
+                    mAnimatingExit = false;
                 }
+                /// M: @}
             }
 
             removeImmediately();
@@ -2394,7 +2418,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             boolean canTurnScreenOn = mAppToken == null || mAppToken.canTurnScreenOn();
 
             if (allowTheaterMode && canTurnScreenOn && !mPowerManagerWrapper.isInteractive()) {
-                if (DEBUG_VISIBILITY || DEBUG_POWER) {
+                if (DEBUG_VISIBILITY || DEBUG_POWER
+                        || mWmService.mWindowManagerDebugger.WMS_DEBUG_USER) {
                     Slog.v(TAG, "Relayout window turning screen on: " + this);
                 }
                 mPowerManagerWrapper.wakeUp(SystemClock.uptimeMillis(),
@@ -3243,7 +3268,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return mTmpRect;
     }
 
-    private int getStackId() {
+    public int getStackId() {
         final TaskStack stack = getStack();
         if (stack == null) {
             return INVALID_STACK_ID;
@@ -3550,6 +3575,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             pw.println(prefix + "mFullConfiguration=" + getConfiguration());
             pw.println(prefix + "mLastReportedConfiguration=" + getLastReportedConfiguration());
         }
+        pw.print(" canReceiveKeys()="); pw.print(canReceiveKeys());
         pw.println(prefix + "mHasSurface=" + mHasSurface
                 + " isReadyForDisplay()=" + isReadyForDisplay()
                 + " mWindowRemovalAllowed=" + mWindowRemovalAllowed);

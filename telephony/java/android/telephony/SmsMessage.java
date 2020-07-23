@@ -115,8 +115,11 @@ public class SmsMessage {
      *
      * @hide
      */
+    // MTK-START
+    // Modification for sub class
     @UnsupportedAppUsage
-    private int mSubId = 0;
+    protected int mSubId = 0;
+    // MTK-END
 
     /** set Subscription information
      *
@@ -149,10 +152,13 @@ public class SmsMessage {
                     + Arrays.toString(encodedMessage);
         }
 
+        // MTK-START
+        // Modification for sub class
         /**
          * @hide
          */
-        protected SubmitPdu(SubmitPduBase spb) {
+        public SubmitPdu(SubmitPduBase spb) {
+        // MTK-END
             this.encodedMessage = spb.encodedMessage;
             this.encodedScAddress = spb.encodedScAddress;
         }
@@ -884,8 +890,12 @@ public class SmsMessage {
      *
      * @return true if Cdma format should be used for MO SMS, false otherwise.
      */
+    // MTK-START
+    // Modification for sub class
+    /** {@hide} */
     @UnsupportedAppUsage
-    private static boolean useCdmaFormatForMoSms() {
+    protected static boolean useCdmaFormatForMoSms() {
+    // MTK-END
         // IMS is registered with SMS support, check the SMS format supported
         return useCdmaFormatForMoSms(SmsManager.getDefaultSmsSubscriptionId());
     }
@@ -899,8 +909,12 @@ public class SmsMessage {
      *
      * @return true if Cdma format should be used for MO SMS, false otherwise.
      */
+    // MTK-START
+    // Modification for sub class
+    /** {@hide} */
     @UnsupportedAppUsage
-    private static boolean useCdmaFormatForMoSms(int subId) {
+    protected static boolean useCdmaFormatForMoSms(int subId) {
+    // MTK-END
         SmsManager smsManager = SmsManager.getSmsManagerForSubscriptionId(subId);
         if (!smsManager.isImsSmsSupported()) {
             // use Voice technology to determine SMS format.
@@ -915,7 +929,11 @@ public class SmsMessage {
      *
      * @return true if current phone type is cdma, false otherwise.
      */
-    private static boolean isCdmaVoice() {
+    // MTK-START
+    // Modification for sub class
+    /** {@hide} */
+    protected static boolean isCdmaVoice() {
+    // MTK-END
         return isCdmaVoice(SmsManager.getDefaultSmsSubscriptionId());
     }
 
@@ -924,7 +942,11 @@ public class SmsMessage {
       *
       * @return true if current phone type is cdma, false otherwise.
       */
-     private static boolean isCdmaVoice(int subId) {
+     // MTK-START
+     // Modification for sub class
+     /** {@hide} */
+     protected static boolean isCdmaVoice(int subId) {
+     // MTK-END
          int activePhone = TelephonyManager.getDefault().getCurrentPhoneType(subId);
          return (PHONE_TYPE_CDMA == activePhone);
    }

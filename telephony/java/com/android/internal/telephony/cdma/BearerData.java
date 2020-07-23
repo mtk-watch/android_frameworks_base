@@ -38,7 +38,7 @@ import java.util.TimeZone;
 /**
  * An object to encode and decode CDMA SMS bearer data.
  */
-public final class BearerData {
+public class BearerData {
     private final static String LOG_TAG = "BearerData";
 
     /**
@@ -360,7 +360,7 @@ public final class BearerData {
     public ArrayList<CdmaSmsCbProgramResults> serviceCategoryProgramResults;
 
 
-    private static class CodingException extends Exception {
+    public static class CodingException extends Exception {
         public CodingException(String s) {
             super(s);
         }
@@ -454,7 +454,7 @@ public final class BearerData {
         outStream.skip(3);
     }
 
-    private static int countAsciiSeptets(CharSequence msg, boolean force) {
+    protected static int countAsciiSeptets(CharSequence msg, boolean force) {
         int msgLen = msg.length();
         if (force) return msgLen;
         for (int i = 0; i < msgLen; i++) {
@@ -642,6 +642,10 @@ public final class BearerData {
         if (uData.msgEncodingSet) {
             if (uData.msgEncoding == UserData.ENCODING_GSM_7BIT_ALPHABET) {
                 encode7bitEms(uData, headerData, true);
+            // MTK-START, fix data SMS sending fail issue.
+            } else if (uData.msgEncoding == UserData.ENCODING_OCTET) {
+                encodeOctetEms(uData, headerData);
+            // MTK-END
             } else if (uData.msgEncoding == UserData.ENCODING_UNICODE_16) {
                 encode16bitEms(uData, headerData);
             } else if (uData.msgEncoding == UserData.ENCODING_7BIT_ASCII) {
@@ -1574,7 +1578,12 @@ public final class BearerData {
         if (paramBits >= EXPECTED_PARAM_SIZE) {
             paramBits -= EXPECTED_PARAM_SIZE;
             decodeSuccess = true;
+            // MTK-START: AOSP use the wrong member variables.
+            /*
             bData.deferredDeliveryTimeRelative = inStream.read(8);
+            */
+            bData.validityPeriodRelative = inStream.read(8);
+            // MTK-END
         }
         if ((! decodeSuccess) || (paramBits > 0)) {
             Rlog.d(LOG_TAG, "VALIDITY_PERIOD_RELATIVE decode " +
@@ -1582,7 +1591,12 @@ public final class BearerData {
                       " (extra bits = " + paramBits + ")");
         }
         inStream.skip(paramBits);
+        // MTK-START: AOSP use the wrong member variables.
+        /*
         bData.deferredDeliveryTimeRelativeSet = decodeSuccess;
+        */
+        bData.validityPeriodRelativeSet = decodeSuccess;
+        // MTK-END
         return decodeSuccess;
     }
 
@@ -1594,7 +1608,12 @@ public final class BearerData {
         if (paramBits >= EXPECTED_PARAM_SIZE) {
             paramBits -= EXPECTED_PARAM_SIZE;
             decodeSuccess = true;
+            // MTK-START: AOSP use the wrong member variables.
+            /*
             bData.validityPeriodRelative = inStream.read(8);
+            */
+            bData.deferredDeliveryTimeRelative = inStream.read(8);
+            // MTK-END
         }
         if ((! decodeSuccess) || (paramBits > 0)) {
             Rlog.d(LOG_TAG, "DEFERRED_DELIVERY_TIME_RELATIVE decode " +
@@ -1602,7 +1621,12 @@ public final class BearerData {
                       " (extra bits = " + paramBits + ")");
         }
         inStream.skip(paramBits);
+        // MTK-START: AOSP use the wrong member variables.
+        /*
         bData.validityPeriodRelativeSet = decodeSuccess;
+        */
+        bData.deferredDeliveryTimeRelativeSet = decodeSuccess;
+        // MTK-END
         return decodeSuccess;
     }
 
@@ -1852,7 +1876,7 @@ public final class BearerData {
      *
      * @param serviceCategory is the service category from the SMS envelope
      */
-    private static void decodeCmasUserData(BearerData bData, int serviceCategory)
+    public static void decodeCmasUserData(BearerData bData, int serviceCategory)
             throws BitwiseInputStream.AccessException, CodingException {
         BitwiseInputStream inStream = new BitwiseInputStream(bData.userData.payload);
         if (inStream.available() < 8) {
@@ -1938,7 +1962,7 @@ public final class BearerData {
         return decode(smsData, 0);
     }
 
-    private static boolean isCmasAlertCategory(int category) {
+    public static boolean isCmasAlertCategory(int category) {
         return category >= SmsEnvelope.SERVICE_CATEGORY_CMAS_PRESIDENTIAL_LEVEL_ALERT
                 && category <= SmsEnvelope.SERVICE_CATEGORY_CMAS_LAST_RESERVED_VALUE;
     }
@@ -2066,4 +2090,23 @@ public final class BearerData {
         }
         return null;
     }
+
+    // MTK-START
+    /**
+     * Support to encode Ems with the octet encoding to fix data SMS sending fail issue.
+     * @param uData The user data.
+     * @param udhData The user data header.
+     */
+    private static void encodeOctetEms(UserData uData, byte[] udhData) {
+        int udhBytes = udhData.length + 1;
+        uData.msgEncoding = UserData.ENCODING_OCTET;
+        uData.msgEncodingSet = true;
+        uData.numFields = udhBytes + uData.payload.length;
+        byte[] payload = new byte[uData.numFields];
+        payload[0] = (byte) udhData.length;
+        System.arraycopy(udhData, 0, payload, 1, udhData.length);
+        System.arraycopy(uData.payload, 0, payload, udhBytes, uData.payload.length);
+        uData.payload = payload;
+    }
+    // MTK-END
 }

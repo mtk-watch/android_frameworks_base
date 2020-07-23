@@ -1286,6 +1286,11 @@ public class MediaRecorder implements AudioRouting,
     public static final int MEDIA_RECORDER_TRACK_INFO_DATA_KBYTES       = 1009;
     /**
      * {@hide}
+     * @internal
+     */
+    public static final int MEDIA_RECORDER_INFO_CAMERA_RELEASE          = 1999;
+    /**
+     * {@hide}
      */
     public static final int MEDIA_RECORDER_TRACK_INFO_LIST_END          = 2000;
 
@@ -1546,6 +1551,10 @@ public class MediaRecorder implements AudioRouting,
 
     private native final int native_getActiveMicrophones(
             ArrayList<MicrophoneInfo> activeMicrophones);
+     /**
+     * M: Special case for camera release notify.
+     */
+    private static final int MEDIA_RECORDER_EVENT_INFO = 2;
 
     //--------------------------------------------------------------------------
     // MicrophoneDirection
@@ -1645,6 +1654,15 @@ public class MediaRecorder implements AudioRouting,
         }
 
         if (mr.mEventHandler != null) {
+            if (what == MEDIA_RECORDER_EVENT_INFO &&
+                    arg1 == MEDIA_RECORDER_INFO_CAMERA_RELEASE) {
+                Log.v(TAG, "MediaRecorder MEDIA_RECORDER_INFO_CAMERA_RELEASE");
+                if (mr.mOnCameraReleasedListener != null) {
+                    /// M: call notify in binder thread, video camera can go on its job.
+                    mr.mOnCameraReleasedListener.onInfo(mr, MEDIA_RECORDER_INFO_CAMERA_RELEASE, 0);
+                }
+                return;
+            }
             Message m = mr.mEventHandler.obtainMessage(what, arg1, arg2, obj);
             mr.mEventHandler.sendMessage(m);
         }
@@ -1703,6 +1721,23 @@ public class MediaRecorder implements AudioRouting,
 
     @Override
     protected void finalize() { native_finalize(); }
+
+    /**
+     * {@hide}
+     */
+    protected OnInfoListener mOnCameraReleasedListener;
+
+    /**
+     * M: Register a callback to invoked when release job has been done while recording.
+     *
+     * @param listener the callback that will be run
+     *
+     * {@hide}
+     * @internal
+     */
+    public void setOnCameraReleasedListener(OnInfoListener listener) {
+        mOnCameraReleasedListener = listener;
+    }
 
     public final static class MetricsConstants
     {

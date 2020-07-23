@@ -17,6 +17,7 @@
 package com.android.server;
 
 import android.content.Context;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -55,7 +56,7 @@ import java.util.Locale;
  */
 final class WiredAccessoryManager implements WiredAccessoryCallbacks {
     private static final String TAG = WiredAccessoryManager.class.getSimpleName();
-    private static final boolean LOG = false;
+    private static final boolean LOG = "eng".equals(Build.TYPE) || "userdebug".equals(Build.TYPE);
 
     private static final int BIT_HEADSET = (1 << 0);
     private static final int BIT_HEADSET_NO_MIC = (1 << 1);
@@ -315,6 +316,8 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
             if (inDevice != 0) {
                 mAudioManager.setWiredDeviceConnectionState(inDevice, state, "", headsetName);
             }
+        } else {
+            Slog.e(TAG, "setDeviceState() No state change ");
         }
     }
 
