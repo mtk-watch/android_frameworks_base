@@ -960,13 +960,23 @@ public final class DataFailCause {
     public static final int LOST_CONNECTION = 0x10004;
     /** @hide */
     public static final int RESET_BY_FRAMEWORK = 0x10005;
-
     /**
      * Data handover failed.
      *
      * @hide
      */
     public static final int HANDOVER_FAILED = 0x10006;
+    /** ESM timer timeout. */
+    /** @hide */
+    public static final int MTK_TCM_ESM_TIMER_TIMEOUT = 0x0F46;
+    /** For FALLBACK PDP Retry cause */
+    /** @hide */
+    public static final int MTK_PDP_FAIL_FALLBACK_RETRY = -1000;
+    /** @hide */
+    public static final int MTK_DUE_TO_REACH_RETRY_COUNTER = 0x0E0F; /* no retry */
+    /** For SSC mode3 PDU setup cause */
+    /** @hide */
+    public static final int MTK_PDU_SSC_MODE_3 = -1100;
 
     /** @hide */
     @IntDef(value = {
@@ -1312,7 +1322,12 @@ public final class DataFailCause {
             UNACCEPTABLE_NETWORK_PARAMETER,
             CONNECTION_TO_DATACONNECTIONAC_BROKEN,
             LOST_CONNECTION,
-            RESET_BY_FRAMEWORK
+            RESET_BY_FRAMEWORK,
+            HANDOVER_FAILED,
+            MTK_TCM_ESM_TIMER_TIMEOUT,
+            MTK_PDP_FAIL_FALLBACK_RETRY,
+            MTK_DUE_TO_REACH_RETRY_COUNTER,
+            MTK_PDU_SSC_MODE_3
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface FailCause{}
@@ -1716,6 +1731,10 @@ public final class DataFailCause {
                 "CONNECTION_TO_DATACONNECTIONAC_BROKEN");
         sFailCauseMap.put(LOST_CONNECTION, "LOST_CONNECTION");
         sFailCauseMap.put(RESET_BY_FRAMEWORK, "RESET_BY_FRAMEWORK");
+        sFailCauseMap.put(MTK_TCM_ESM_TIMER_TIMEOUT, "MTK_TCM_ESM_TIMER_TIMEOUT");
+        sFailCauseMap.put(MTK_PDP_FAIL_FALLBACK_RETRY, "MTK_PDP_FAIL_FALLBACK_RETRY");
+        sFailCauseMap.put(MTK_DUE_TO_REACH_RETRY_COUNTER, "MTK_DUE_TO_REACH_RETRY_COUNTER");
+        sFailCauseMap.put(MTK_PDU_SSC_MODE_3, "MTK_PDU_SSC_MODE_3");
     }
 
     private DataFailCause() {

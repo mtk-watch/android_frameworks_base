@@ -61,10 +61,11 @@ public class RequestThreadManager {
     private final String TAG;
     private final int mCameraId;
     private final RequestHandlerThread mRequestThread;
-
-    private static final boolean DEBUG = false;
+    //!++
+    private static final boolean DEBUG = ParameterUtils.DEBUG;
     // For slightly more spammy messages that will get repeated every frame
-    private static final boolean VERBOSE = false;
+    private static final boolean VERBOSE = ParameterUtils.VERBOSE;
+    //!--
     private Camera mCamera;
     private final CameraCharacteristics mCharacteristics;
 
@@ -268,7 +269,11 @@ public class RequestThreadManager {
                     if (DEBUG) {
                         mPrevCounter.countAndLog();
                     }
-                    mGLThreadManager.queueNewFrame();
+                    //!++
+                    if (mGLThreadManager != null) {
+                    //!--
+                        mGLThreadManager.queueNewFrame();
+                    }
                 }
             };
 
@@ -948,8 +953,13 @@ public class RequestThreadManager {
                             Log.d(TAG, "Stopped repeating request. Last frame number is " +
                                     lastFrameNumber);
                         }
-                        mDeviceState.setRepeatingRequestError(lastFrameNumber,
-                                burstHolder.getRequestId());
+                        if (lastFrameNumber != RequestQueue.INVALID_FRAME) {
+                            mDeviceState.setRepeatingRequestError(lastFrameNumber,
+                                    burstHolder.getRequestId());
+                        } else {
+                            Log.e(TAG, "Repeating request id: " + burstHolder.getRequestId() +
+                                    " already canceled!");
+                        }
                     }
 
                     if (DEBUG) {

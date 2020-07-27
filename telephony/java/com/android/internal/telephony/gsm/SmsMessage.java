@@ -43,6 +43,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.text.ParseException;
 
+// MTK-START
+// Modification for sub class
+import java.lang.reflect.Method;
+import java.lang.reflect.Constructor;
+// MTK-END
+
 /**
  * A Short Message Service message.
  *
@@ -51,7 +57,10 @@ public class SmsMessage extends SmsMessageBase {
     static final String LOG_TAG = "SmsMessage";
     private static final boolean VDBG = false;
 
-    private MessageClass messageClass;
+    // MTK-START
+    // Modification for sub class
+    protected MessageClass messageClass;
+    // MTK-END
 
     /**
      * TP-Message-Type-Indicator
@@ -64,11 +73,20 @@ public class SmsMessage extends SmsMessageBase {
 
     // TP-Data-Coding-Scheme
     // see TS 23.038
-    private int mDataCodingScheme;
+    // MTK-START
+    // Modification for sub class
+    protected int mDataCodingScheme;
+    // MTK-END
 
     // TP-Reply-Path
     // e.g. 23.040 9.2.2.1
     private boolean mReplyPathPresent = false;
+
+    /** The address of the receiver. */
+    // MTK-START
+    // Modification for sub class
+    protected GsmSmsAddress mRecipientAddress;
+    // MTK-END
 
     /**
      *  TP-Status - status of a previously submitted SMS.
@@ -83,19 +101,28 @@ public class SmsMessage extends SmsMessageBase {
      */
     private boolean mIsStatusReportMessage = false;
 
-    private int mVoiceMailCount = 0;
+    // MTK-START
+    // Modification for sub class
+    protected int mVoiceMailCount = 0;
+    // MTK-END
 
-    private static final int VALIDITY_PERIOD_FORMAT_NONE = 0x00;
-    private static final int VALIDITY_PERIOD_FORMAT_ENHANCED = 0x01;
-    private static final int VALIDITY_PERIOD_FORMAT_RELATIVE = 0x02;
-    private static final int VALIDITY_PERIOD_FORMAT_ABSOLUTE = 0x03;
+    // MTK-START
+    // Change visibility for the sub class
+    protected static final int VALIDITY_PERIOD_FORMAT_NONE = 0x00;
+    protected static final int VALIDITY_PERIOD_FORMAT_ENHANCED = 0x01;
+    protected static final int VALIDITY_PERIOD_FORMAT_RELATIVE = 0x02;
+    protected static final int VALIDITY_PERIOD_FORMAT_ABSOLUTE = 0x03;
+    // MTK-END
 
     //Validity Period min - 5 mins
     private static final int VALIDITY_PERIOD_MIN = 5;
     //Validity Period max - 63 weeks
     private static final int VALIDITY_PERIOD_MAX = 635040;
 
-    private static final int INVALID_VALIDITY_PERIOD = -1;
+    // MTK-START
+    // Change visibility for the sub class
+    protected static final int INVALID_VALIDITY_PERIOD = -1;
+    // MTK-END
 
     public static class SubmitPdu extends SubmitPduBase {
     }
@@ -442,8 +469,11 @@ public class SmsMessage extends SmsMessageBase {
      * @throws UnsupportedEncodingException
      * @throws EncodeException if String is too large to encode
      */
-    private static byte[] encodeUCS2(String message, byte[] header)
+    // MTK-START
+    // Modification for sub class
+    protected static byte[] encodeUCS2(String message, byte[] header)
             throws UnsupportedEncodingException, EncodeException {
+    // MTK-END
         byte[] userData, textPart;
         textPart = message.getBytes("utf-16be");
 
@@ -574,9 +604,12 @@ public class SmsMessage extends SmsMessageBase {
      * @param ret <code>SubmitPdu</code> containing the encoded SC
      *        address, if applicable, and the encoded message. Returns null on encode error.
      */
-    private static ByteArrayOutputStream getSubmitPduHead(
+    // MTK-START
+    // Modification for sub class
+    protected static ByteArrayOutputStream getSubmitPduHead(
             String scAddress, String destinationAddress, byte mtiByte,
             boolean statusReportRequested, SubmitPdu ret) {
+    // MTK-END
         ByteArrayOutputStream bo = new ByteArrayOutputStream(
                 MAX_USER_DATA_BYTES + 40);
 
@@ -608,18 +641,33 @@ public class SmsMessage extends SmsMessageBase {
 
         // destination address length in BCD digits, ignoring TON byte and pad
         // TODO Should be better.
-        bo.write((daBytes.length - 1) * 2
-                - ((daBytes[daBytes.length - 1] & 0xf0) == 0xf0 ? 1 : 0));
+        // MTK-START
+        // daBytes may be null when destinationAddress is "+" so we help to fix Google issue here.
+        if (daBytes != null) {
+        // MTK-END
+            bo.write((daBytes.length - 1) * 2
+                     - ((daBytes[daBytes.length - 1] & 0xf0) == 0xf0 ? 1 : 0));
 
-        // destination address
-        bo.write(daBytes, 0, daBytes.length);
+            // destination address
+            bo.write(daBytes, 0, daBytes.length);
+        // MTK-START
+        } else {
+            // TP-Protocol-Identifier
+            Rlog.d(LOG_TAG, "write an empty address for submit pdu");
+            bo.write(0);
+            bo.write(PhoneNumberUtils.TOA_Unknown);
+        }
+        // MTK-END
 
         // TP-Protocol-Identifier
         bo.write(0);
         return bo;
     }
 
-    private static class PduParser {
+    // MTK-START
+    // Modification for sub class
+    protected static class PduParser {
+    // MTK-END
         byte mPdu[];
         int mCur;
         SmsHeader mUserDataHeader;
@@ -745,7 +793,10 @@ public class SmsMessage extends SmsMessageBase {
          *  of octets
          * @return the number of septets or octets in the user data payload
          */
-        int constructUserData(boolean hasUserDataHeader, boolean dataInSeptets) {
+        // MTK-START
+        // Modification for sub class
+        public int constructUserData(boolean hasUserDataHeader, boolean dataInSeptets) {
+        // MTK-END
             int offset = mCur;
             int userDataLength = mPdu[offset++] & 0xff;
             int headerSeptets = 0;
@@ -804,7 +855,10 @@ public class SmsMessage extends SmsMessageBase {
          *
          * @return the user data payload, not including the headers
          */
-        byte[] getUserData() {
+        // MTK-START
+        // Modification for sub class
+        public byte[] getUserData() {
+        // MTK-END
             return mUserData;
         }
 
@@ -813,7 +867,10 @@ public class SmsMessage extends SmsMessageBase {
          *
          * {@hide}
          */
-        SmsHeader getUserDataHeader() {
+        // MTK-START
+        // Modification for sub class
+        public SmsHeader getUserDataHeader() {
+        // MTK-END
             return mUserDataHeader;
         }
 
@@ -824,8 +881,11 @@ public class SmsMessage extends SmsMessageBase {
          * @param septetCount the number of septets in the user data payload
          * @return a String with the decoded characters
          */
-        String getUserDataGSM7Bit(int septetCount, int languageTable,
+        // MTK-START
+        // Modification for sub class
+        public String getUserDataGSM7Bit(int septetCount, int languageTable,
                 int languageShiftTable) {
+        // MTK-END
             String ret;
 
             ret = GsmAlphabet.gsm7BitPackedToString(mPdu, mCur, septetCount,
@@ -843,7 +903,10 @@ public class SmsMessage extends SmsMessageBase {
          * @param byteCount the number of byest in the user data payload
          * @return a String with the decoded characters
          */
-        String getUserDataGSM8bit(int byteCount) {
+        // MTK-START
+        // Modification for sub class
+        public String getUserDataGSM8bit(int byteCount) {
+        // MTK-END
             String ret;
 
             ret = GsmAlphabet.gsm8BitUnpackedToString(mPdu, mCur, byteCount);
@@ -860,7 +923,10 @@ public class SmsMessage extends SmsMessageBase {
          * @param byteCount the number of bytes in the user data payload
          * @return a String with the decoded characters
          */
-        String getUserDataUCS2(int byteCount) {
+        // MTK-START
+        // Modification for sub class
+        public String getUserDataUCS2(int byteCount) {
+        // MTK-END
             String ret;
 
             try {
@@ -881,7 +947,10 @@ public class SmsMessage extends SmsMessageBase {
          * @param byteCount the number of bytes in the user data payload
          * @return a String with the decoded characters
          */
-        String getUserDataKSC5601(int byteCount) {
+        // MTK-START
+        // Modification for sub class
+        public String getUserDataKSC5601(int byteCount) {
+        // MTK-END
             String ret;
 
             try {
@@ -1021,7 +1090,10 @@ public class SmsMessage extends SmsMessageBase {
      * characters 2A (IRA 50 and 65))" ...in the case of cell broadcast,
      * something else...
      */
-    private void parsePdu(byte[] pdu) {
+    // MTK-START
+    // Modification for sub class
+    protected void parsePdu(byte[] pdu) {
+    // MTK-END
         mPdu = pdu;
         // Rlog.d(LOG_TAG, "raw sms message:");
         // Rlog.d(LOG_TAG, s);
@@ -1067,7 +1139,10 @@ public class SmsMessage extends SmsMessageBase {
      * @param p A PduParser, cued past the first byte.
      * @param firstByte The first byte of the PDU, which contains MTI, etc.
      */
-    private void parseSmsStatusReport(PduParser p, int firstByte) {
+    // MTK-START
+    // Modification for sub class
+    protected void parseSmsStatusReport(PduParser p, int firstByte) {
+    // MTK-END
         mIsStatusReportMessage = true;
 
         // TP-Message-Reference
@@ -1085,7 +1160,11 @@ public class SmsMessage extends SmsMessageBase {
             // TP-Parameter-Indicator
             int extraParams = p.getByte();
             int moreExtraParams = extraParams;
-            while ((moreExtraParams & 0x80) != 0) {
+            // MTK-START
+            // Google issue. In order to avoid exception, we have to do more data check before
+            // getByte()
+            while (((moreExtraParams & 0x80) != 0) && (p.moreDataPresent() == true)) {
+            // MTK-END
                 // We only know how to parse a few extra parameters, all
                 // indicated in the first TP-PI octet, so skip over any
                 // additional TP-PI octets.
@@ -1149,7 +1228,10 @@ public class SmsMessage extends SmsMessageBase {
      * @param p A PduParser, cued past the first byte.
      * @param firstByte The first byte of the PDU, which contains MTI, etc.
      */
-    private void parseSmsSubmit(PduParser p, int firstByte) {
+    // MTK-START
+    // Modification for sub class
+    protected void parseSmsSubmit(PduParser p, int firstByte) {
+    // MTK-END
         mReplyPathPresent = (firstByte & 0x80) == 0x80;
 
         // TP-MR (TP-Message Reference)
@@ -1208,7 +1290,10 @@ public class SmsMessage extends SmsMessageBase {
      * @param hasUserDataHeader Indicates whether a header is present in the
      *                          User Data.
      */
-    private void parseUserData(PduParser p, boolean hasUserDataHeader) {
+    // MTK-START
+    // Modification for sub class
+    protected void parseUserData(PduParser p, boolean hasUserDataHeader) {
+    // MTK-END
         boolean hasMessageClass = false;
         boolean userDataCompressed = false;
 
@@ -1490,4 +1575,24 @@ public class SmsMessage extends SmsMessageBase {
         }
         return mVoiceMailCount;
     }
+
+    // MTK-START
+    // M: Revise for sub class
+    protected static SmsHeader makeSmsHeader() {
+        SmsHeader header = null;
+        String className = "com.mediatek.internal.telephony.MtkSmsHeader";
+        String classPackage = "/system/framework/mediatek-framework.jar";
+        Class<?> clazz = null;
+        try {
+            clazz = Class.forName(className);
+            Constructor clazzConstructfunc = clazz.getDeclaredConstructor(new Class[] {});
+            header = (SmsHeader) clazzConstructfunc.newInstance();
+            Rlog.d(LOG_TAG, "Make MtkSmsHeader successfully!");
+        } catch (Exception  e) {
+            header = new SmsHeader();
+            Rlog.d(LOG_TAG, "MtkSmsHeader does not exist!");
+        }
+        return header;
+    }
+    // MTK-END
 }

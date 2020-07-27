@@ -22,8 +22,10 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.hardware.radio.V1_4.ApnTypes;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.SystemProperties;
 import android.provider.Telephony;
 import android.provider.Telephony.Carriers;
 import android.telephony.Rlog;
@@ -35,6 +37,7 @@ import android.util.Log;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -192,12 +195,18 @@ public class ApnSetting implements Parcelable {
     @Retention(RetentionPolicy.SOURCE)
     public @interface MvnoType {}
 
-    private static final Map<String, Integer> APN_TYPE_STRING_MAP;
-    private static final Map<Integer, String> APN_TYPE_INT_MAP;
-    private static final Map<String, Integer> PROTOCOL_STRING_MAP;
-    private static final Map<Integer, String> PROTOCOL_INT_MAP;
-    private static final Map<String, Integer> MVNO_TYPE_STRING_MAP;
-    private static final Map<Integer, String> MVNO_TYPE_INT_MAP;
+    /** @hide */
+    protected static Map<String, Integer> APN_TYPE_STRING_MAP;
+    /** @hide */
+    protected static Map<Integer, String> APN_TYPE_INT_MAP;
+    /** @hide */
+    protected static Map<String, Integer> PROTOCOL_STRING_MAP;
+    /** @hide */
+    protected static Map<Integer, String> PROTOCOL_INT_MAP;
+    /** @hide */
+    protected static Map<String, Integer> MVNO_TYPE_STRING_MAP;
+    /** @hide */
+    protected static Map<Integer, String> MVNO_TYPE_INT_MAP;
 
     static {
         APN_TYPE_STRING_MAP = new ArrayMap<String, Integer>();
@@ -262,8 +271,9 @@ public class ApnSetting implements Parcelable {
     private final int mMmsProxyPort;
     private final String mUser;
     private final String mPassword;
-    private final int mAuthType;
-    private final int mApnTypeBitmask;
+    private int mAuthType;
+    /** @hide */
+    protected int mApnTypeBitmask;
     private final int mId;
     private final String mOperatorNumeric;
     private final int mProtocol;
@@ -290,6 +300,48 @@ public class ApnSetting implements Parcelable {
     private final int mCarrierId;
 
     private final int mSkip464Xlat;
+
+    /**
+     * Static methods used for MTK add-on reflections
+     */
+    private static Method sMethodFromStringEx;
+    private static Method sMethodGetApnTypeStringEx;
+    private static Method sMethodGetApnTypesBitmaskFromStringEx;
+    static {
+        if (SystemProperties.get("ro.vendor.mtk_telephony_add_on_policy", "0").equals("0")) {
+            Class<?> clz = null;
+            try {
+                clz = Class.forName("mediatek.telephony.data.MtkApnSetting");
+            } catch (Exception e) {
+                Rlog.d(LOG_TAG, e.toString());
+            }
+            if (clz != null) {
+                try {
+                    sMethodFromStringEx = clz.getDeclaredMethod("fromStringEx", String[].class,
+                            int.class, int.class, int.class, int.class, boolean.class,
+                            int.class, int.class, boolean.class, int.class, int.class, int.class,
+                            int.class, int.class, String.class, int.class, int.class, int.class);
+                    sMethodFromStringEx.setAccessible(true);
+                } catch (Exception e) {
+                    Rlog.d(LOG_TAG, e.toString());
+                }
+            }
+            try {
+                sMethodGetApnTypeStringEx =
+                        clz.getDeclaredMethod("getApnTypeStringEx", int.class);
+                sMethodGetApnTypeStringEx.setAccessible(true);
+            } catch (Exception e) {
+                Rlog.d(LOG_TAG, e.toString());
+            }
+            try {
+                sMethodGetApnTypesBitmaskFromStringEx =
+                        clz.getDeclaredMethod("getApnTypesBitmaskFromStringEx", String.class);
+                sMethodGetApnTypesBitmaskFromStringEx.setAccessible(true);
+            } catch (Exception e) {
+                Rlog.d(LOG_TAG, e.toString());
+            }
+        }
+    }
 
     /**
      * Returns the MTU size of the mobile interface to which the APN connected.
@@ -639,7 +691,8 @@ public class ApnSetting implements Parcelable {
         return mSkip464Xlat;
     }
 
-    private ApnSetting(Builder builder) {
+    /** @hide */
+    protected ApnSetting(Builder builder) {
         this.mEntryName = builder.mEntryName;
         this.mApnName = builder.mApnName;
         this.mProxyAddress = builder.mProxyAddress;
@@ -978,6 +1031,21 @@ public class ApnSetting implements Parcelable {
             networkTypeBitmask =
                 ServiceState.convertBearerBitmaskToNetworkTypeBitmask(bearerBitmask);
         }
+        /// M: reflection for telephony add-on @{
+        try {
+            if (sMethodFromStringEx != null) {
+                return (ApnSetting) sMethodFromStringEx.invoke(null, a, authType,
+                        getApnTypesBitmaskFromString(TextUtils.join(",", typeArray)),
+                        getProtocolIntFromString(protocol),
+                        getProtocolIntFromString(roamingProtocol), carrierEnabled,
+                        networkTypeBitmask, profileId, modemCognitive, maxConns, waitTime,
+                        maxConnsTime, mtu, getMvnoTypeIntFromString(mvnoType), mvnoMatchData,
+                        apnSetId, carrierId, skip464xlat);
+            }
+        } catch (Exception e) {
+            Rlog.d(LOG_TAG, e.toString());
+        }
+        /// @}
         return makeApnSetting(-1, a[10] + a[11], a[0], a[1], a[2],
             portFromString(a[3]), UriFromString(a[7]), a[8],
             portFromString(a[9]), a[4], a[5], authType,
@@ -1062,7 +1130,8 @@ public class ApnSetting implements Parcelable {
             && !TextUtils.isEmpty(mMvnoMatchData);
     }
 
-    private boolean hasApnType(int type) {
+    /** @hide */
+    protected boolean hasApnType(int type) {
         return (mApnTypeBitmask & type) == type;
     }
 
@@ -1310,6 +1379,18 @@ public class ApnSetting implements Parcelable {
      * @hide
      */
     public static String getApnTypeString(int apnType) {
+        /// M: reflection for telephony add-on @{
+        try {
+            if (sMethodGetApnTypeStringEx != null) {
+                Bundle b = (Bundle) sMethodGetApnTypeStringEx.invoke(null, apnType);
+                if (b != null) {
+                    return b.getString("result");
+                }
+            }
+        } catch (Exception e) {
+            Rlog.d(LOG_TAG, e.toString());
+        }
+        /// @}
         if (apnType == TYPE_ALL) {
             return "*";
         }
@@ -1323,6 +1404,18 @@ public class ApnSetting implements Parcelable {
      * @hide
      */
     public static int getApnTypesBitmaskFromString(String types) {
+        /// M: reflection for telephony add-on @{
+        try {
+            if (sMethodGetApnTypesBitmaskFromStringEx != null) {
+                Bundle b = (Bundle) sMethodGetApnTypesBitmaskFromStringEx.invoke(null, types);
+                if (b != null) {
+                    return b.getInt("result");
+                }
+            }
+        } catch (Exception e) {
+            Rlog.d(LOG_TAG, e.toString());
+        }
+        /// @}
         // If unset, set to ALL.
         if (TextUtils.isEmpty(types)) {
             return TYPE_ALL;
@@ -1363,11 +1456,13 @@ public class ApnSetting implements Parcelable {
         return  protocolString == null ? UNSPECIFIED_STRING : protocolString;
     }
 
-    private static Uri UriFromString(String uri) {
+    /** @hide */
+    protected static Uri UriFromString(String uri) {
         return TextUtils.isEmpty(uri) ? null : Uri.parse(uri);
     }
 
-    private static String UriToString(Uri uri) {
+    /** @hide */
+    protected static String UriToString(Uri uri) {
         return uri == null ? null : uri.toString();
     }
 
@@ -1401,7 +1496,8 @@ public class ApnSetting implements Parcelable {
         return TextUtils.isEmpty(hostName) ? address : hostName;
     }
 
-    private static int portFromString(String strPort) {
+    /** @hide */
+    protected static int portFromString(String strPort) {
         int port = UNSPECIFIED_INT;
         if (!TextUtils.isEmpty(strPort)) {
             try {
@@ -1413,7 +1509,8 @@ public class ApnSetting implements Parcelable {
         return port;
     }
 
-    private static String portToString(int port) {
+    /** @hide */
+    protected static String portToString(int port) {
         return port == UNSPECIFIED_INT ? null : Integer.toString(port);
     }
 
@@ -1586,8 +1683,9 @@ public class ApnSetting implements Parcelable {
          * Sets the unique database id for this entry.
          *
          * @param id the unique database id to set for this entry
+         * @hide
          */
-        private Builder setId(int id) {
+        public Builder setId(int id) {
             this.mId = id;
             return this;
         }

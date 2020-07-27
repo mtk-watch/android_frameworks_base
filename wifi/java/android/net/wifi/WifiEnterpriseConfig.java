@@ -16,6 +16,7 @@
 package android.net.wifi;
 
 import android.annotation.Nullable;
+import android.annotation.ProductApi;
 import android.annotation.UnsupportedAppUsage;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -110,6 +111,8 @@ public class WifiEnterpriseConfig implements Parcelable {
     public static final String PLMN_KEY            = "plmn";
     /** @hide */
     public static final String CA_CERT_ALIAS_DELIMITER = " ";
+    /** @hide */
+    public static final String KEY_SIMNUM          = "sim_num";
 
     // Fields to copy verbatim from wpa_supplicant.
     private static final String[] SUPPLICANT_CONFIG_KEYS = new String[] {
@@ -1163,6 +1166,26 @@ public class WifiEnterpriseConfig implements Parcelable {
             return false;
         }
         return true;
+    }
+
+    /** @hide */
+    @ProductApi
+    public void setSimNum(int simNum) {
+         if (simNum < 0) {
+             throw new IllegalArgumentException("Invalid sim num");
+         } else {
+             setFieldValue(KEY_SIMNUM, Integer.toString(simNum));
+         }
+    }
+
+    /** @hide */
+    @ProductApi
+    public int getSimNum() {
+        try {
+            return Integer.parseInt(getFieldValue(KEY_SIMNUM));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     /**

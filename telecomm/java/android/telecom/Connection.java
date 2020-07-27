@@ -3104,7 +3104,8 @@ public abstract class Connection extends Conferenceable {
      */
     public void handleRttUpgradeResponse(@Nullable RttTextStream rttTextStream) {}
 
-    static String toLogSafePhoneNumber(String number) {
+    /** {@hide} */
+    public static String toLogSafePhoneNumber(String number) {
         // For unknown number, log empty string.
         if (number == null) {
             return "";

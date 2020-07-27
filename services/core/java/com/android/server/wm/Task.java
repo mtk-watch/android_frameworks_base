@@ -482,6 +482,13 @@ class Task extends WindowContainer<AppWindowToken> implements ConfigurationConta
 
     /** Bounds of the task to be used for dimming, as well as touch related tests. */
     public void getDimBounds(Rect out) {
+        /// M: check null pointer, mStack maybe set as null {@
+        if (mStack == null) {
+            Slog.w(TAG, "getDimBounds: mStack has been removed.");
+            return;
+        }
+        /// @}
+
         final DisplayContent displayContent = mStack.getDisplayContent();
         // It doesn't matter if we in particular are part of the resize, since we couldn't have
         // a DimLayer anyway if we weren't visible.

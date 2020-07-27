@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @hide
  */
-final class ConnectionServiceAdapter implements DeathRecipient {
+public final class ConnectionServiceAdapter implements DeathRecipient {
     /**
      * ConcurrentHashMap constructor params: 8 is initial table size, 0.9f is
      * load factor before resizing, 1 means we only expect a single thread to
@@ -87,7 +87,7 @@ final class ConnectionServiceAdapter implements DeathRecipient {
         }
     }
 
-    void handleCreateConnectionComplete(
+    public void handleCreateConnectionComplete(
             String id,
             ConnectionRequest request,
             ParcelableConnection connection) {
@@ -420,7 +420,7 @@ final class ConnectionServiceAdapter implements DeathRecipient {
         }
     }
 
-    void setConferenceableConnections(String callId, List<String> conferenceableCallIds) {
+    public void setConferenceableConnections(String callId, List<String> conferenceableCallIds) {
         Log.v(this, "setConferenceableConnections: %s, %s", callId, conferenceableCallIds);
         for (IConnectionServiceAdapter adapter : mAdapters) {
             try {

@@ -137,13 +137,30 @@ import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+/// M: [Reflection] Launch location extension by java reflection
+import android.os.Build;
+import android.os.SystemProperties;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+/// M: mtk add end
+
 /**
  * The service class that manages LocationProviders and issues location
  * updates and alerts.
  */
 public class LocationManagerService extends ILocationManager.Stub {
     private static final String TAG = "LocationManagerService";
-    public static final boolean D = Log.isLoggable(TAG, Log.DEBUG);
+    /// M: [Debug] Enhance the location logs
+    private static final boolean IS_USER_BUILD =
+            "user".equals(Build.TYPE) || "userdebug".equals(Build.TYPE);
+
+    private static final String PROP_FORCE_DEBUG_KEY = "persist.vendor.log.tel_dbg";
+    public static final boolean FORCE_DEBUG =
+            (SystemProperties.getInt(PROP_FORCE_DEBUG_KEY, 0) == 1);
+
+    public static final boolean D = IS_USER_BUILD ?
+            (Log.isLoggable(TAG, Log.DEBUG) || FORCE_DEBUG) : true;
+    /// M: mtk add end
 
     private static final String WAKELOCK_KEY = "*location*";
 
@@ -295,6 +312,10 @@ public class LocationManagerService extends ILocationManager.Stub {
 
     public void systemRunning() {
         synchronized (mLock) {
+            /// M: [Reflection] Init Mtk location manager service extension
+            initMtkLocationManagerService();
+            /// M: mtk add end
+
             initializeLocked();
         }
     }
@@ -521,6 +542,9 @@ public class LocationManagerService extends ILocationManager.Stub {
 
     @GuardedBy("mLock")
     private void onLocationModeChangedLocked(boolean broadcast) {
+        /// M: [Debug] add for settings changed
+        Log.d(TAG, "onLocationModeChangedLocked broadcast:" + broadcast);
+        /// M: mtk add end
         if (D) {
             Log.d(TAG, "location enabled is now " + isLocationEnabled());
         }
@@ -540,6 +564,9 @@ public class LocationManagerService extends ILocationManager.Stub {
 
     @GuardedBy("mLock")
     private void onProviderAllowedChangedLocked() {
+        /// M: [Debug] add for settings changed
+        Log.d(TAG, "onProviderAllowedChangedLocked");
+        /// M: mtk add end
         for (LocationProvider p : mProviders) {
             p.onAllowedChangedLocked();
         }
@@ -575,10 +602,10 @@ public class LocationManagerService extends ILocationManager.Stub {
             for (UpdateRecord record : entry.getValue()) {
                 if (record.mReceiver.mCallerIdentity.mUid == uid
                         && record.mIsForegroundUid != foreground) {
-                    if (D) {
-                        Log.d(TAG, "request from uid " + uid + " is now "
-                                + foregroundAsString(foreground));
-                    }
+                    /// M: [Debug] Always log location requested app foreground/background switch
+                    Log.d(TAG, "request from uid " + uid + " is now "
+                            + foregroundAsString(foreground));
+                    /// M: mtk add end
                     record.updateForeground(foreground);
 
                     if (!isThrottlingExemptLocked(record.mReceiver.mCallerIdentity)) {
@@ -671,6 +698,9 @@ public class LocationManagerService extends ILocationManager.Stub {
         String setting = Settings.Global.getString(
                 mContext.getContentResolver(),
                 Settings.Global.LOCATION_IGNORE_SETTINGS_PACKAGE_WHITELIST);
+        /// M: [Debug] log ignore whitelist
+        Log.d(TAG, "Ignore whitelist changed as: " + setting);
+        /// M: mtk add end
         if (!TextUtils.isEmpty(setting)) {
             mIgnoreSettingsPackageWhitelist.addAll(Arrays.asList(setting.split(",")));
         }
@@ -1155,9 +1185,9 @@ public class LocationManagerService extends ILocationManager.Stub {
                         return;
                     }
 
-                    if (D) {
-                        Log.d(TAG, mName + " provider enabled is now " + mEnabled);
-                    }
+                    /// M: [Debug] always log mEnable status changed
+                    Log.d(TAG, mName + " provider mEnable: " + mEnabled + " --> " + enabled);
+                    /// M: mtk add end
 
                     mEnabled = enabled;
                     onUseableChangedLocked(false);
@@ -1194,9 +1224,9 @@ public class LocationManagerService extends ILocationManager.Stub {
                     return;
                 }
 
-                if (D) {
-                    Log.d(TAG, mName + " provider allowed is now " + mAllowed);
-                }
+                /// M: [Debug] Always log mAllowed status changed
+                Log.d(TAG, mName + " provider mAllowed: " + mAllowed +" --> " +allowed);
+                /// M: mtk add end
 
                 mAllowed = allowed;
                 onUseableChangedLocked(true);
@@ -1239,12 +1269,18 @@ public class LocationManagerService extends ILocationManager.Stub {
                             Settings.Secure.LOCATION_PROVIDERS_ALLOWED,
                             "+" + mName,
                             mCurrentUserId);
+                    /// M: [Debug] Add log for settings changing
+                    Log.d(TAG, mName +" onUseableChangedLocked Add back provider: " + mName);
+                    /// M: mtk add end
                 } else if (!useableIgnoringAllowed) {
                     Settings.Secure.putStringForUser(
                             mContext.getContentResolver(),
                             Settings.Secure.LOCATION_PROVIDERS_ALLOWED,
                             "-" + mName,
                             mCurrentUserId);
+                    /// M: [Debug] Add log for settings changing
+                    Log.d(TAG, mName +" onUseableChangedLocked remove provider: " + mName);
+                    /// M: mtk add end
                 }
 
                 // needs to be sent to all users because whether or not a provider is enabled for
@@ -1258,11 +1294,11 @@ public class LocationManagerService extends ILocationManager.Stub {
             if (useable == mUseable) {
                 return;
             }
+            /// M: [Debug] always log mUsable status changed
+            Log.d(TAG, mName + " provider mUseable: " + mUseable +" --> " + useable);
+            /// M: mtk add end
             mUseable = useable;
 
-            if (D) {
-                Log.d(TAG, mName + " provider useable is now " + mUseable);
-            }
 
             if (!mUseable) {
                 // If any provider has been disabled, clear all last locations for all
@@ -1877,10 +1913,16 @@ public class LocationManagerService extends ILocationManager.Stub {
 
     private int getAllowedResolutionLevel(int pid, int uid) {
         if (mContext.checkPermission(android.Manifest.permission.ACCESS_FINE_LOCATION,
-                pid, uid) == PERMISSION_GRANTED) {
+                pid, uid) == PERMISSION_GRANTED
+                /// M: [CTA] Add to check AppOps permissions.
+                && mtkCheckCtaOp(pid, uid, AppOpsManager.OP_FINE_LOCATION)) {
+                /// M: mtk add end
             return RESOLUTION_LEVEL_FINE;
         } else if (mContext.checkPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                pid, uid) == PERMISSION_GRANTED) {
+                pid, uid) == PERMISSION_GRANTED
+            /// M: [CTA] Add to check AppOps permissions.
+            && mtkCheckCtaOp(pid, uid, AppOpsManager.OP_COARSE_LOCATION)) {
+            /// M: mtk add end
             return RESOLUTION_LEVEL_COARSE;
         } else {
             return RESOLUTION_LEVEL_NONE;
@@ -1978,7 +2020,11 @@ public class LocationManagerService extends ILocationManager.Stub {
         int op = resolutionLevelToOp(allowedResolutionLevel);
         if (op >= 0) {
             if (mAppOps.noteOpNoThrow(op, uid, packageName) != AppOpsManager.MODE_ALLOWED) {
-                return false;
+                /// M: [CTA] Add to note AppOps permissions.
+                if (!mtkNoteOpForCta(op, pid, uid, packageName, allowedResolutionLevel)) {
+                    return false;
+                }
+                /// M: mtk add end
             }
         }
 
@@ -1990,7 +2036,11 @@ public class LocationManagerService extends ILocationManager.Stub {
         int op = resolutionLevelToOp(allowedResolutionLevel);
         if (op >= 0) {
             if (mAppOps.checkOp(op, uid, packageName) != AppOpsManager.MODE_ALLOWED) {
-                return false;
+                /// M: [CTA] Add to check AppOps permissions.
+                if (!mtkCheckOpForCta(op, pid, uid, packageName, allowedResolutionLevel)) {
+                    return false;
+                }
+                /// M: mtk add end
             }
         }
 
@@ -2168,7 +2218,22 @@ public class LocationManagerService extends ILocationManager.Stub {
                     if (isSettingsExemptLocked(record)) {
                         providerRequest.locationSettingsIgnored = true;
                         providerRequest.lowPowerMode = false;
+                        /// M: [Debug] Log Settings Exempt to request location update case
+                        Log.d(TAG, "applyRequirementsLocked for SettingsExempt case,"
+                            + " provider: " + provider.getName()
+                            + " provider.isUseableLocked(): " + provider.isUseableLocked()
+                            + " isBatterySaverDisablingLocation: " + isBatterySaverDisablingLocation
+                            + " isSettingsExemptLocked(record): " + isSettingsExemptLocked(record)
+                            + " record: " + record);
+                        /// M: mtk debug end
                     } else {
+                        /// M: [Debug] Log skipping apply requirements case
+                        Log.d(TAG, "Skip applyRequirementsLocked, provider: " + provider.getName()
+                            + " provider.isUseableLocked(): " + provider.isUseableLocked()
+                            + " isBatterySaverDisablingLocation: " + isBatterySaverDisablingLocation
+                            + " isSettingsExemptLocked(record): " + isSettingsExemptLocked(record)
+                            + " record: " + record);
+                        /// M: mtk add end
                         continue;
                     }
                 }
@@ -2552,7 +2617,9 @@ public class LocationManagerService extends ILocationManager.Stub {
                     receiver = getReceiverLocked(listener, pid, uid, packageName, workSource,
                             hideFromAppOps);
                 }
-                requestLocationUpdatesLocked(sanitizedRequest, receiver, uid, packageName);
+                /// M: [CTA] print CTA information to add pid parameter
+                requestLocationUpdatesLocked(sanitizedRequest, receiver, pid, uid, packageName);
+                /// M: mtk add end
             } finally {
                 Binder.restoreCallingIdentity(identity);
             }
@@ -2560,8 +2627,10 @@ public class LocationManagerService extends ILocationManager.Stub {
     }
 
     @GuardedBy("mLock")
+    /// M: [CTA] print CTA information to add pid parameter
     private void requestLocationUpdatesLocked(LocationRequest request, Receiver receiver,
-            int uid, String packageName) {
+            int pid, int uid, String packageName) {
+    /// M: mtk add end
         // Figure out the provider. Either its explicitly request (legacy use cases), or
         // use the fused provider
         if (request == null) request = DEFAULT_LOCATION_REQUEST;
@@ -2572,17 +2641,23 @@ public class LocationManagerService extends ILocationManager.Stub {
 
         LocationProvider provider = getLocationProviderLocked(name);
         if (provider == null) {
+            /// M: [NLP check] show toast when no NLP is installed
+            mHandler.post(() -> {
+                mtkShowNlpNotInstalledToast(name);
+            });
+            /// M: mtk add end
             throw new IllegalArgumentException("provider doesn't exist: " + name);
         }
 
         UpdateRecord record = new UpdateRecord(name, request, receiver);
-        if (D) {
-            Log.d(TAG, "request " + Integer.toHexString(System.identityHashCode(receiver))
-                    + " " + name + " " + request + " from " + packageName + "(" + uid + " "
-                    + (record.mIsForegroundUid ? "foreground" : "background")
-                    + (isThrottlingExemptLocked(receiver.mCallerIdentity)
-                    ? " [whitelisted]" : "") + ")");
-        }
+        /// M: [Debug] Always log requesting location updates.
+        Log.d(TAG, "request " + Integer.toHexString(System.identityHashCode(receiver))
+                + " " + name + " " + request + " from " + packageName + "(" + uid + " "
+                + (record.mIsForegroundUid ? "foreground" : "background")
+                + (isThrottlingExemptLocked(receiver.mCallerIdentity)
+                ? " [whitelisted]" : "") + ")");
+        Log.d(TAG, "Location Settings Mode isEnabled = " + isLocationEnabled());
+        /// M: mtk add end
 
         UpdateRecord oldRecord = receiver.mUpdateRecords.put(name, record);
         if (oldRecord != null) {
@@ -2595,6 +2670,9 @@ public class LocationManagerService extends ILocationManager.Stub {
             receiver.callProviderEnabledLocked(name, false);
         }
 
+        /// M: [CTA] print CTA information
+        mtkPrintCtaLog(pid, uid, "requestLocationUpdates", "USE_LOCATION", name);
+        /// M: mtk add end
         applyRequirementsLocked(name);
 
         // Update the monitoring here just in case multiple location requests were added to the
@@ -2635,7 +2713,9 @@ public class LocationManagerService extends ILocationManager.Stub {
 
     @GuardedBy("mLock")
     private void removeUpdatesLocked(Receiver receiver) {
-        if (D) Log.i(TAG, "remove " + Integer.toHexString(System.identityHashCode(receiver)));
+        /// M: [Debug] Always log removing requests.
+        Log.i(TAG, "remove " + Integer.toHexString(System.identityHashCode(receiver)));
+        /// M: add end
 
         if (mReceivers.remove(receiver.mKey) != null && receiver.isListener()) {
             unlinkFromListenerDeathNotificationLocked(receiver.getListener().asBinder(),
@@ -2715,6 +2795,10 @@ public class LocationManagerService extends ILocationManager.Stub {
                 if (location == null) {
                     return null;
                 }
+
+                /// M: [CTA] print Cta information
+                mtkPrintCtaLog(pid, uid, "getLastLocation", "READ_LOCATION_INFO", name);
+                /// mtk add end
 
                 // Don't return stale location to apps with foreground-only location permission.
                 String op = resolutionLevelToOpStr(allowedResolutionLevel);
@@ -2887,6 +2971,11 @@ public class LocationManagerService extends ILocationManager.Stub {
 
     @Override
     public boolean registerGnssStatusCallback(IGnssStatusListener listener, String packageName) {
+        /// M: [Debug] Add to log registered GnssStatus callback packages.
+        IBinder binder = listener != null ? listener.asBinder() : null;
+        Log.d(TAG, "registerGnssStatusCallback by package: " + packageName
+                + " ,listener binder: " + binder);
+        /// M: mtk add end
         return addGnssDataListener(listener, packageName, "GnssStatusListener",
                 mGnssStatusProvider, mGnssStatusListeners,
                 this::unregisterGnssStatusCallback);
@@ -2894,6 +2983,10 @@ public class LocationManagerService extends ILocationManager.Stub {
 
     @Override
     public void unregisterGnssStatusCallback(IGnssStatusListener listener) {
+        /// M: [Debug] Add to log unregister GnssStatus callback.
+        IBinder binder = listener != null ? listener.asBinder() : null;
+        Log.d(TAG, "unregisterGnssStatusCallback, callback binder: " + binder);
+        /// M: mtk add end
         removeGnssDataListener(listener, mGnssStatusProvider, mGnssStatusListeners);
     }
 
@@ -3300,7 +3393,14 @@ public class LocationManagerService extends ILocationManager.Stub {
             }
         }
 
-        if (D) Log.d(TAG, "incoming location: " + location);
+        /// M: [Debug] Always log incoming locations.
+        if (D) {
+            Log.d(TAG, "incoming location: " + location);
+        } else {
+            /// M: [Debug] Do not log location info for user's privacy.
+            Log.d(TAG, "incoming location from: " + location.getProvider());
+        }
+        /// M: mtk add end
         long now = SystemClock.elapsedRealtime();
         if (provider.isUseableLocked()) {
             updateLastLocationLocked(location, provider.getName());
@@ -3335,6 +3435,10 @@ public class LocationManagerService extends ILocationManager.Stub {
         Location coarseLocation = null;
         if (noGPSLocation != null) {
             coarseLocation = mLocationFudger.getOrCreate(noGPSLocation);
+        /// M: [CTA] Added coarseLocation by lastLocationCoarse.
+        } else if (isCtaSupported()) {
+            coarseLocation = mLocationFudger.getOrCreate(lastLocationCoarseInterval);
+        /// M: mtk add end
         }
 
         ArrayList<Receiver> deadReceivers = null;
@@ -3790,4 +3894,150 @@ public class LocationManagerService extends ILocationManager.Stub {
                     + isThrottlingExemptLocked(callerIdentity));
         }
     }
+
+    /// M: mtk add start
+    private Class<?> mMtkLocationManagerServiceClass = null;
+    private Object mMtkLocationManagerService = null;
+    private boolean mCtaSupported = false;
+
+    /// M: [Reflection] MTK LocationManagerService creation function by java reflection.
+    // It can avoid build fail when the MTK location extension is not existed.
+    private void initMtkLocationManagerService() {
+        String className = "com.mediatek.location.MtkLocationExt$LocationManagerService";
+        Class<?> clazz = null;
+        try {
+            mMtkLocationManagerServiceClass = Class.forName(className);
+            if (D) Log.d(TAG, "class = " + mMtkLocationManagerServiceClass);
+            if (mMtkLocationManagerServiceClass != null) {
+                Constructor constructor = mMtkLocationManagerServiceClass.getConstructor(
+                        new Class[] {Context.class, Handler.class});
+                if (constructor != null) {
+                    mMtkLocationManagerService = constructor.newInstance(
+                            new Object[] {mContext, mHandler});
+                }
+            }
+            mCtaSupported = checkCtaSuport();
+            Log.d(TAG, "mMtkLocationManagerService = " + mMtkLocationManagerService
+                    +" mCtaSupported = " + mCtaSupported);
+        } catch (Exception  e) {
+            Log.w(TAG, "Failed to init mMtkLocationManagerService!");
+        }
+    }
+
+    private boolean isCtaSupported() {
+        return mCtaSupported;
+    }
+
+    private boolean checkCtaSuport() {
+        Boolean ret = false;
+        try {
+            if (mMtkLocationManagerService != null) {
+                Method m = null;
+                m = mMtkLocationManagerServiceClass.getMethod("isCtaFeatureSupport",
+                        new Class[] {});
+                ret = (Boolean) m.invoke(mMtkLocationManagerService, new Object[] {});
+                Log.d(TAG, "checkCtaSupport = " + ret);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to call isCtaFeatureSupport!");
+        }
+        return ret;
+    }
+
+    private void mtkPrintCtaLog(int callingPid, int callingUid, String functionName,
+            String actionType, String parameter) {
+        try {
+            if (isCtaSupported()) {
+                Method m = null;
+                m = mMtkLocationManagerServiceClass.getMethod("printCtaLog",
+                        new Class[] {int.class, int.class,
+                        String.class, String.class, String.class});
+                m.invoke(mMtkLocationManagerService, new Object[] {
+                        callingPid, callingUid, functionName, actionType, parameter});
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to call printCtaLog!");
+        }
+    }
+
+    ///M: [CTA] CTA security requirements to allow fine and coarse location permissions can
+    // be independently grant or deny by users.
+    private boolean mtkCheckCtaOp(int pid, int uid, int op) {
+        if (!isCtaSupported()) {
+            return true;
+        }
+        boolean granted = false;
+        String[] pkgs = mContext.getPackageManager().getPackagesForUid(uid);
+
+        if (pkgs == null) {
+            Log.d(TAG, "checkOp(pid = " + pid + ", uid = " + uid +
+                    ") pkg == null, return false");
+            return granted;
+        }
+        for (String pkg:pkgs) {
+            int mode = mAppOps.checkOpNoThrow(op, uid, pkg);
+            if (mode == AppOpsManager.MODE_ALLOWED || mode == AppOpsManager.MODE_IGNORED) {
+                granted = true;
+                break;
+            } else {
+                Log.d(TAG, "checkOp(pid = " + pid + ", uid = " + uid + ", op = " + op
+                        + ", pkg = " + pkg + ", mode = " + mode +") NOT Allowed or Ignored");
+            }
+        }
+        return granted;
+    }
+
+    private boolean mtkNoteOpForCta(int op, int pid, int uid, String packageName,
+            int allowedResolutionLevel) {
+        if (isCtaSupported()) {
+            if (op == AppOpsManager.OP_FINE_LOCATION) {
+                if (mAppOps.noteOpNoThrow(AppOpsManager.OP_COARSE_LOCATION, uid,
+                    packageName) != AppOpsManager.MODE_ALLOWED) {
+                    Log.d(TAG, "noteOpNoThrow(op = OP_COARSE_LOCATION"
+                            + ", uid = " + uid + ", pkg = " + packageName + ") != ALLOWED");
+                    return false;
+                }
+            } else {
+                Log.d(TAG, "noteOpNoThrow(op = OP_COARSE_LOCATION) returns false");
+                return false;
+            }
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean mtkCheckOpForCta(int op, int pid, int uid, String packageName,
+            int allowedResolutionLevel) {
+        if (isCtaSupported()) {
+            if (op == AppOpsManager.OP_FINE_LOCATION) {
+                if (mAppOps.checkOp(AppOpsManager.OP_COARSE_LOCATION, uid, packageName)
+                        != AppOpsManager.MODE_ALLOWED) {
+                    Log.d(TAG, "checkOp(op = OP_COARSE_LOCATION" +
+                            " , uid = " + uid + ", pkg = " + packageName + ") != ALLOWED");
+                    return false;
+                }
+            } else {
+                Log.d(TAG, "checkOp(op = OP_COARSE_LOCATION) returns false");
+                return false;
+            }
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    private void mtkShowNlpNotInstalledToast(String provider) {
+        try {
+            if (mMtkLocationManagerService != null) {
+                Method m = null;
+                m = mMtkLocationManagerServiceClass.getMethod("showNlpNotInstalledToast",
+                        new Class[] {String.class});
+                m.invoke(mMtkLocationManagerService, new Object[] {provider});
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to call showNlpNotInstalledToast ", e);
+        }
+    }
+    /// M: mtk add end
 }

@@ -25,7 +25,9 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
-
+//add for testing rsc
+#include "android-base/properties.h"
+//end
 #include <android-base/file.h>
 #include <android-base/logging.h>
 #include <android-base/stringprintf.h>
@@ -47,6 +49,7 @@ static const char* kPathWhitelist[] = {
   "/dev/urandom",
   "/dev/ion",
   "/dev/dri/renderD129", // Fixes b/31172436
+  "/system/framework/mediatek-res.apk", // MTK add
 };
 
 static const char kFdPath[] = "/proc/self/fd";
@@ -138,7 +141,18 @@ bool FileDescriptorWhitelist::IsAllowed(const std::string& path) const {
       && path.find("/../") == std::string::npos) {
     return true;
   }
-
+  //add for testing rsc
+  // add for system rsc overlay directory.
+  std::string sys_rsc_overlay_path = android::base::GetProperty("ro.sys.current_rsc_path", "");
+  sys_rsc_overlay_path = sys_rsc_overlay_path + "/overlay";
+  LOG(WARNING) << "system rsc path:" << sys_rsc_overlay_path;
+  LOG(WARNING) << "fd check path:" << path;
+  if (android::base::StartsWith(path, sys_rsc_overlay_path)
+      && android::base::EndsWith(path, kApkSuffix)
+      && (path.find("/../") == std::string::npos)) {
+    return true;
+  }
+  //end
   return false;
 }
 

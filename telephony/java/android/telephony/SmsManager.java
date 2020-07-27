@@ -39,6 +39,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+// MTK_START: Revise for telephony add on
+import android.os.SystemProperties;
+// MTK-END
 import android.provider.Telephony;
 import android.text.TextUtils;
 import android.util.ArrayMap;
@@ -57,6 +60,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+
+// MTK-START
+import java.lang.reflect.Method;
+import java.lang.reflect.Constructor;
+// MTK-END
 
 /*
  * TODO(code review): Curious question... Why are a lot of these
@@ -1347,6 +1355,11 @@ public final class SmsManager {
         } catch (RemoteException ex) {
             Log.e(TAG, "resolveSubscriptionForOperation", ex);
         }
+
+        // MTK-START
+        isSmsSimPickActivityNeeded = checkSimPickActivityNeeded(isSmsSimPickActivityNeeded);
+        // MTK-END
+
         if (!isSmsSimPickActivityNeeded) {
             sendResolverResult(resolverResult, subId, false /*pickActivityShown*/);
             return;
@@ -2929,6 +2942,32 @@ public final class SmsManager {
         return filtered;
     }
 
+    // MTK-START
+    private boolean checkSimPickActivityNeeded(boolean needed) {
+        String className = "mediatek.telephony.MtkSmsManager";
+        Class<?> clazz = null;
+        boolean result = needed;
+        if (SystemProperties.get("ro.vendor.mtk_telephony_add_on_policy", "0").equals("0")) {
+            try {
+                clazz = Class.forName(className);
+                if (clazz != null) {
+                    Method clazzMethod = clazz.getDeclaredMethod("checkSimPickActivityNeeded",
+                        boolean.class);
+                    if (clazzMethod != null) {
+                        result = (boolean)clazzMethod.invoke(null, result);
+                    } else {
+                        Rlog.e(TAG, "checkSimPickActivityNeeded() does not exist!");
+                    }
+                } else {
+                    Rlog.e(TAG, "MtkSmsManager does not exist!");
+                }
+            } catch (Exception e) {
+                Rlog.e(TAG, "checkSimPickActivityNeeded() does not exist! " + e);
+            }
+        }
+        return result;
+    }
+    // MTK-END
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = {"SMS_CATEGORY_"},

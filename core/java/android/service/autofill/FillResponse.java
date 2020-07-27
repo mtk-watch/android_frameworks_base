@@ -27,6 +27,7 @@ import android.annotation.TestApi;
 import android.app.Activity;
 import android.content.IntentSender;
 import android.content.pm.ParceledListSlice;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -600,7 +601,7 @@ public final class FillResponse implements Parcelable {
     /////////////////////////////////////
     @Override
     public String toString() {
-        if (!sDebug) return super.toString();
+        if (!sDebug || Build.TYPE.equals("user")) return super.toString();
 
         // TODO: create a dump() method instead
         final StringBuilder builder = new StringBuilder(

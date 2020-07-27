@@ -364,8 +364,14 @@ class UserController implements Handler.Callback {
                         "framework_locked_boot_completed", uptimeSeconds);
                 final int MAX_UPTIME_SECONDS = 120;
                 if (uptimeSeconds > MAX_UPTIME_SECONDS) {
-                    Slog.wtf("SystemServerTiming",
+                    /// M: Reduce WTF for userdebug and eng load
+                    if ("user".equals(Build.TYPE)) {
+                        Slog.wtf("SystemServerTiming",
                             "finishUserBoot took too long. uptimeSeconds=" + uptimeSeconds);
+                    } else {
+                        Slog.w("SystemServerTiming",
+                            "finishUserBoot took too long. uptimeSeconds=" + uptimeSeconds);
+                    }
                 }
             }
 

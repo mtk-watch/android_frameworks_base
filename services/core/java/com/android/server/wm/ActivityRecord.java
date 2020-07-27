@@ -236,7 +236,7 @@ import java.util.Objects;
 /**
  * An entry in the history stack, representing an activity.
  */
-final class ActivityRecord extends ConfigurationContainer {
+public final class ActivityRecord extends ConfigurationContainer {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "ActivityRecord" : TAG_ATM;
     private static final String TAG_CONFIGURATION = TAG + POSTFIX_CONFIGURATION;
     private static final String TAG_SAVED_STATE = TAG + POSTFIX_SAVED_STATE;
@@ -264,9 +264,9 @@ final class ActivityRecord extends ConfigurationContainer {
     // TODO: Remove after unification
     AppWindowToken mAppWindowToken;
 
-    final ActivityInfo info; // all about me
+    public final ActivityInfo info; // all about me
     // TODO: This is duplicated state already contained in info.applicationInfo - remove
-    ApplicationInfo appInfo; // information about activity's app
+    public ApplicationInfo appInfo; // information about activity's app
     final int launchedFromPid; // always the pid who started the activity.
     final int launchedFromUid; // always the uid who started the activity.
     final String launchedFromPackage; // always the package who started the activity.
@@ -275,7 +275,7 @@ final class ActivityRecord extends ConfigurationContainer {
     final ComponentName mActivityComponent;  // the intent component, or target of an alias.
     final String shortComponentName; // the short component name of the intent
     final String resolvedType; // as per original caller;
-    final String packageName; // the package implementing intent's component
+    public final String packageName; // the package implementing intent's component
     final String processName; // process where this component wants to run
     final String taskAffinity; // as per ActivityInfo.taskAffinity
     final boolean stateNotNeeded; // As per ActivityInfo.flags
@@ -320,7 +320,7 @@ final class ActivityRecord extends ConfigurationContainer {
     AppTimeTracker appTimeTracker; // set if we are tracking the time in this app/task/activity
     ActivityServiceConnectionsHolder mServiceConnectionsHolder; // Service connections.
     UriPermissionOwner uriPermissions; // current special URI access perms.
-    WindowProcessController app;      // if non-null, hosting application
+    public WindowProcessController app;      // if non-null, hosting application
     private ActivityState mState;    // current state we are in
     Bundle  icicle;         // last saved activity state
     PersistableBundle persistentState; // last persistently saved activity state
@@ -3487,6 +3487,10 @@ final class ActivityRecord extends ConfigurationContainer {
             results = null;
             newIntents = null;
             mAtmService.getAppWarningsLocked().onResumeActivity(this);
+
+            /// M: onAfterActivityResumed @{
+            mAtmService.mAmsExt.onAfterActivityResumed(this);
+            /// M: onAfterActivityResumed @}
         } else {
             final ActivityStack stack = getActivityStack();
             if (stack != null) {

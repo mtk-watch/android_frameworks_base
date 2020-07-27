@@ -467,4 +467,17 @@ public final class InCallAdapter {
         } catch (RemoteException ignored) {
         }
     }
+
+    /**
+     * Mediatek APIs related with call operations.
+     *
+     * @param params The bundle of operation parameters.
+     * @hide
+     */
+    public void doMtkAction(Bundle params) {
+        try {
+            mAdapter.doMtkAction(params);
+        } catch (RemoteException ignored) {
+        }
+    }
 }

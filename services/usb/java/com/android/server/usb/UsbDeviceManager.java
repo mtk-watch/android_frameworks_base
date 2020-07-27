@@ -1450,13 +1450,25 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
             // wait for the transition to complete.
             // give up after 1 second.
             String value = null;
-            for (int i = 0; i < 20; i++) {
+            for (int i = 0; i < 30; i++) {
                 // State transition is done when sys.usb.state is set to the new configuration
                 value = getSystemProperty(USB_STATE_PROPERTY, "");
                 if (state.equals(value)) return true;
                 SystemClock.sleep(50);
             }
             Slog.e(TAG, "waitForState(" + state + ") FAILED: got " + value);
+            return false;
+        }
+
+        private boolean waitForAdbState(String state) {
+            // wait for adb to stop
+            String value = null;
+            for (int i = 0; i < 40; i++) {
+                value = getSystemProperty("init.svc.adbd", "stopped");
+                if (state.equals(value)) return true;
+                SystemClock.sleep(50);
+            }
+            Slog.e(TAG, "waitForAdbState(" + state + ") FAILED: got " + value);
             return false;
         }
 
@@ -1584,6 +1596,10 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                 if (!waitForState(UsbManager.USB_FUNCTION_NONE)) {
                     Slog.e(TAG, "Failed to kick USB config");
                     return false;
+                }
+
+                if (!waitForAdbState("stopped")) {
+                    Slog.e(TAG, "Failed to wait adb state");
                 }
 
                 /**

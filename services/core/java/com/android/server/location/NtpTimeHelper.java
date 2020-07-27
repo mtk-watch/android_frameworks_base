@@ -188,4 +188,10 @@ class NtpTimeHelper {
             // This happens when the WakeLock is already released.
         }
     }
+
+    /// M: set NTP time state to avoid sync when network available
+    public void setNtpTimeStateIdle() {
+        mInjectNtpTimeState = STATE_IDLE;
+    }
+    /// M: mtk add end
 }

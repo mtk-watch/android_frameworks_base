@@ -74,7 +74,7 @@ import java.util.List;
  * Full information about a particular process that
  * is currently running.
  */
-class ProcessRecord implements WindowProcessListener {
+public class ProcessRecord implements WindowProcessListener {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "ProcessRecord" : TAG_AM;
 
     private final ActivityManagerService mService; // where we came from
@@ -83,7 +83,7 @@ class ProcessRecord implements WindowProcessListener {
     final boolean appZygote;    // true if this is forked from the app zygote
     final int uid;              // uid of process; may be different from 'info' if isolated
     final int userId;           // user of process.
-    final String processName;   // name of the process
+    public final String processName;   // name of the process
     // List of packages running in the process
     final PackageList pkgList = new PackageList();
     final class PackageList {
@@ -124,12 +124,12 @@ class ProcessRecord implements WindowProcessListener {
             = new ProcessList.ProcStateMemTracker();
     UidRecord uidRecord;        // overall state of process's uid.
     ArraySet<String> pkgDeps;   // additional packages we have a dependency on
-    IApplicationThread thread;  // the actual proc...  may be null only if
+    public IApplicationThread thread;  // the actual proc...  may be null only if
                                 // 'persistent' is true (in which case we
                                 // are in the process of launching the app)
     ProcessState baseProcessTracker;
     BatteryStatsImpl.Uid.Proc curProcBatteryStats;
-    int pid;                    // The process of this application; 0 if none
+    public int pid;             // The process of this application; 0 if none
     String procStatFile;        // path to /proc/<pid>/stat
     int[] gids;                 // The gids this process was launched with
     private String mRequiredAbi;// The ABI this process was launched with
@@ -147,7 +147,7 @@ class ProcessRecord implements WindowProcessListener {
     int maxAdj;                 // Maximum OOM adjustment for this process
     private int mCurRawAdj;     // Current OOM unlimited adjustment for this process
     int setRawAdj;              // Last set OOM unlimited adjustment for this process
-    int curAdj;                 // Current OOM adjustment for this process
+    public int curAdj;          // Current OOM adjustment for this process
     int setAdj;                 // Last set OOM adjustment for this process
     int verifiedAdj;            // The last adjustment that was verified as actually being set
     long lastCompactTime;       // The last time that this process was compacted
@@ -997,7 +997,7 @@ class ProcessRecord implements WindowProcessListener {
         return mCurSchedGroup;
     }
 
-    void setCurProcState(int curProcState) {
+    public void setCurProcState(int curProcState) {
         mCurProcState = curProcState;
         mWindowProcessController.setCurrentProcState(mCurProcState);
     }
@@ -1458,6 +1458,15 @@ class ProcessRecord implements WindowProcessListener {
             }
         }
 
+        final ProcessRecord parentPr = parentProcess != null
+                ? (ProcessRecord) parentProcess.mOwner : null;
+
+        /// M: ANR Debug Mechanism
+        if (mService.mAnrManager.startAnrDump(mService, this, activityShortComponentName, aInfo,
+                parentShortComponentName, parentPr, aboveSystem, annotation, getShowBackground(),
+                anrTime))
+            return;
+
         // Log the ANR to the main log.
         StringBuilder info = new StringBuilder();
         info.setLength(0);
@@ -1536,8 +1545,7 @@ class ProcessRecord implements WindowProcessListener {
                         : StatsLog.ANROCCURRED__FOREGROUND_STATE__BACKGROUND,
                 getProcessClassEnum(),
                 (this.info != null) ? this.info.packageName : "");
-        final ProcessRecord parentPr = parentProcess != null
-                ? (ProcessRecord) parentProcess.mOwner : null;
+
         mService.addErrorToDropBox("anr", this, processName, activityShortComponentName,
                 parentShortComponentName, parentPr, annotation, cpuInfo, tracesFile, null);
 

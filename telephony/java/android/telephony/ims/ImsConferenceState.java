@@ -16,6 +16,14 @@
 
 package android.telephony.ims;
 
+import java.util.HashMap;
+import java.util.Iterator;
+/// M: For VoLTE conference call. @{
+import java.util.LinkedHashMap;
+/// @}
+import java.util.Map.Entry;
+import java.util.Set;
+
 import android.annotation.SystemApi;
 import android.os.Bundle;
 import android.os.Parcel;
@@ -90,7 +98,11 @@ public final class ImsConferenceState implements Parcelable {
      */
     public static final String SIP_STATUS_CODE = "sipstatuscode";
 
-    public final HashMap<String, Bundle> mParticipants = new HashMap<String, Bundle>();
+    /// M: We assume the first one stands for the host in XML package, so we must ensure
+    ///    the reading order is the same with writing. @{
+    // public final HashMap<String, Bundle> mParticipants = new HashMap<String, Bundle>();
+    public final HashMap<String, Bundle> mParticipants = new LinkedHashMap<String, Bundle>();
+    /// @}
 
     /** @hide */
     public ImsConferenceState() {

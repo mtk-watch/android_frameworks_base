@@ -80,6 +80,13 @@ public:
     // Depending on installed extensions, the result is either Android native fence or EGL fence.
     status_t createReleaseFence(bool useFenceSync, EGLSyncKHR* eglFence, sp<Fence>& nativeFence);
 
+    /// M: Check whether surface is valid or not.
+    bool isSurfaceValid(EGLSurface surface);
+
+private:
+    /// M: Notify GPU hook driver that the current context is HWUI.
+    void notifyDrvIsHWUI();
+
 private:
     enum class SwapBehavior {
         Discard,

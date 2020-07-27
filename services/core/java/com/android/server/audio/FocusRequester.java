@@ -22,6 +22,7 @@ import android.media.AudioAttributes;
 import android.media.AudioFocusInfo;
 import android.media.AudioManager;
 import android.media.IAudioFocusDispatcher;
+import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
 
@@ -40,7 +41,8 @@ public class FocusRequester {
 
     // on purpose not using this classe's name, as it will only be used from MediaFocusControl
     private static final String TAG = "MediaFocusControl";
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = "eng".equals(Build.TYPE)
+        || "userdebug".equals(Build.TYPE);
 
     private AudioFocusDeathHandler mDeathHandler; // may be null
     private IAudioFocusDispatcher mFocusDispatcher; // may be null

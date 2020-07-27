@@ -185,7 +185,7 @@ import javax.crypto.spec.PBEKeySpec;
  * watch for and manage dynamically added storage, such as SD cards and USB mass
  * storage. Also decides how storage should be presented to users on the device.
  */
-class StorageManagerService extends IStorageManager.Stub
+public class StorageManagerService extends IStorageManager.Stub
         implements Watchdog.Monitor, ScreenObserver {
 
     // Static direct instance pointer for the tightly-coupled idle service to use
@@ -205,7 +205,7 @@ class StorageManagerService extends IStorageManager.Stub
     private static final String ISOLATED_STORAGE_ENABLED = "isolated_storage_enabled";
 
     public static class Lifecycle extends SystemService {
-        private StorageManagerService mStorageManagerService;
+        protected StorageManagerService mStorageManagerService;
 
         public Lifecycle(Context context) {
             super(context);
@@ -302,7 +302,7 @@ class StorageManagerService extends IStorageManager.Stub
      * <em>Never</em> hold the lock while performing downcalls into vold, since
      * unsolicited events can suddenly appear to update data structures.
      */
-    private final Object mLock = LockGuard.installNewLock(LockGuard.INDEX_STORAGE);
+    protected final Object mLock = LockGuard.installNewLock(LockGuard.INDEX_STORAGE);
 
     /**
      * Similar to {@link #mLock}, never hold this lock while performing downcalls into vold.
@@ -328,7 +328,7 @@ class StorageManagerService extends IStorageManager.Stub
     private ArrayMap<String, DiskInfo> mDisks = new ArrayMap<>();
     /** Map from volume ID to disk */
     @GuardedBy("mLock")
-    private final ArrayMap<String, VolumeInfo> mVolumes = new ArrayMap<>();
+    protected final ArrayMap<String, VolumeInfo> mVolumes = new ArrayMap<>();
 
     /** Map from UUID to record */
     @GuardedBy("mLock")
@@ -345,7 +345,13 @@ class StorageManagerService extends IStorageManager.Stub
     @GuardedBy("mLock")
     private String mMoveTargetUuid;
 
-    private volatile int mCurrentUserId = UserHandle.USER_SYSTEM;
+    /**
+     * List of volumes visible to any user.
+     * TODO: may be have a map of userId -> volumes?
+     */
+    private final CopyOnWriteArrayList<VolumeInfo> mVisibleVols = new CopyOnWriteArrayList<>();
+
+    protected volatile int mCurrentUserId = UserHandle.USER_SYSTEM;
 
     /** Holding lock for AppFuse business */
     private final Object mAppFuseLock = new Object();
@@ -455,7 +461,7 @@ class StorageManagerService extends IStorageManager.Stub
     public static final String[] CRYPTO_TYPES
         = { "password", "default", "pattern", "pin" };
 
-    private final Context mContext;
+    protected final Context mContext;
     private final ContentResolver mResolver;
 
     private volatile IVold mVold;
@@ -707,7 +713,7 @@ class StorageManagerService extends IStorageManager.Stub
         }
     }
 
-    private final Handler mHandler;
+    protected final Handler mHandler;
 
     private BroadcastReceiver mUserReceiver = new BroadcastReceiver() {
         @Override
@@ -1556,7 +1562,7 @@ class StorageManagerService extends IStorageManager.Stub
         }
     }
 
-    private void start() {
+    public void start() {
         connect();
     }
 

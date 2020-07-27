@@ -194,6 +194,19 @@ public class DrmStore {
          */
         public static final int DISPLAY = 0x07;
 
+        /// M: These 2 types are added for OMA DRM v1.0 implementation. @{
+        /**
+         * @hide
+         * M: The rights-protected content can be printed.
+         */
+        public static final int PRINT = 0x08;
+        /**
+         * @hide
+         * M: The rights-protected content can be set as wallpaper.
+         */
+        public static final int WALLPAPER = 0x09; // for FL only
+        /// @}
+
         /* package */ static boolean isValid(int action) {
             boolean isValid = false;
 
@@ -206,6 +219,9 @@ public class DrmStore {
                 case PREVIEW:
                 case EXECUTE:
                 case DISPLAY:
+                /// M: Added for OMA DRM v1.0 implementation
+                case PRINT:
+                case WALLPAPER:
                     isValid = true;
             }
             return isValid;
@@ -238,6 +254,12 @@ public class DrmStore {
          * The digital rights have not been acquired for the rights-protected content.
          */
         public static final int RIGHTS_NOT_ACQUIRED = 0x03;
+
+        /**
+         * The digital rights can't be used because Secure timer is invalid
+         * @hide
+         */
+        public static final int SECURE_TIMER_INVALID = 0x04;
 
         /**
          * @deprecated This class should have been an interface instead.

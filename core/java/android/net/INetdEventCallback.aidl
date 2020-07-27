@@ -23,6 +23,8 @@ oneway interface INetdEventCallback {
     const int CALLBACK_CALLER_CONNECTIVITY_SERVICE = 0;
     const int CALLBACK_CALLER_DEVICE_POLICY = 1;
     const int CALLBACK_CALLER_NETWORK_WATCHLIST = 2;
+    // M: Support CTA network monitor
+    const int CALLBACK_CALLER_CTA_NETWORK_MONITOR = 3;
 
     /**
      * Reports a single DNS lookup function call.

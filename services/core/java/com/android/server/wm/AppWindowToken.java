@@ -138,7 +138,7 @@ class AppTokenList extends ArrayList<AppWindowToken> {
  * Version of WindowToken that is specifically for a particular application (or
  * really activity) that is displaying windows.
  */
-class AppWindowToken extends WindowToken implements WindowManagerService.AppFreezeListener,
+public class AppWindowToken extends WindowToken implements WindowManagerService.AppFreezeListener,
         ConfigurationContainerListener {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "AppWindowToken" : TAG_WM;
 
@@ -1507,6 +1507,14 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
             return false;
         }
 
+        /// M: Should remove the duplicate starting window @{
+        if (startingSurface != null || mStartingData != null) {
+            Slog.v(TAG_WM, "transferStartingWindow,"
+                + " fromToken already add a starting window.");
+            removeStartingWindow();
+        }
+        /// @}
+
         final WindowState tStartingWindow = fromToken.startingWindow;
         if (tStartingWindow != null && fromToken.startingSurface != null) {
             // In this case, the starting icon has already been displayed, so start
@@ -2199,6 +2207,13 @@ class AppWindowToken extends WindowToken implements WindowManagerService.AppFree
                     }
                     return;
                 }
+
+                ///M: Check starting surface aleady add or not.
+                if (startingSurface != null) {
+                    Slog.v(TAG_WM, "already has a starting surface!!!");
+                    return;
+                }
+
                 startingData = mStartingData;
             }
 

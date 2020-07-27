@@ -22,6 +22,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UnsupportedAppUsage;
 import android.mtp.MtpConstants;
+import android.os.SystemProperties;
 
 import libcore.net.MimeUtils;
 
@@ -78,6 +79,8 @@ public class MediaFile {
     // maps MTP format code to mime type
     @UnsupportedAppUsage
     private static final HashMap<Integer, String> sFormatToMimeTypeMap = new HashMap<>();
+    ///M: maps ext and mime type to support MTK feature
+    private static final HashMap<String, String> sMimeTypeMap = new HashMap<>();
 
     /** @deprecated file types no longer exist */
     @Deprecated
@@ -91,6 +94,13 @@ public class MediaFile {
         }
         if (!sFormatToMimeTypeMap.containsKey(mtpFormatCode)) {
             sFormatToMimeTypeMap.put(mtpFormatCode, mimeType);
+        }
+    }
+
+    ///M: maps ext and mime type to support MTK feature
+    private static void addMimeType(String ext, @NonNull String mimeType) {
+        if (!sMimeTypeMap.containsKey(ext)) {
+            sMimeTypeMap.put(ext, mimeType);
         }
     }
 
@@ -152,6 +162,39 @@ public class MediaFile {
                 "application/vnd.ms-powerpoint");
         addFileType(MtpConstants.FORMAT_MS_POWERPOINT_PRESENTATION,
                 "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+
+        /// M: Add more audio/video/image file types to maps. {@
+        if (SystemProperties.getBoolean("ro.vendor.mtk_audio_ape_support", false)) {
+          addMimeType("ape", "audio/ape");
+        }
+        if (SystemProperties.getBoolean("ro.vendor.mtk_support_mp2_playback", false)) {
+          addMimeType("MP2", "audio/mpeg");
+        }
+        if (SystemProperties.getBoolean("ro.vendor.mtk_audio_alac_support", false)) {
+          addMimeType("caf", "audio/caf");
+        }
+        if (SystemProperties.getBoolean("ro.vendor.mtk_audio_alac_support", false)) {
+          addMimeType("WAV", "audio/adpcm");
+        }
+        if (SystemProperties.getBoolean("ro.vendor.mtk_flv_playback_support", false)) {
+          addMimeType("FLV", "video/x-flv");
+          addMimeType("F4V", "video/x-flv");
+          addMimeType("PFV", "video/x-flv");
+          addMimeType("FLA", "video/x-flv");
+        }
+        if (SystemProperties.getBoolean("ro.vendor.mtk_mtkps_playback_support", false)) {
+          addMimeType("PS", "video/mp2p");
+          addMimeType("VOB", "video/mp2p");
+          addMimeType("DAT", "video/mp2p");
+        }
+        if (SystemProperties.getBoolean("ro.vendor.mtk_cta_set", false)) {
+            addMimeType("mudp", "cta/mudp");
+        }
+        if (SystemProperties.getBoolean("ro.vendor.mtk_oma_drm_support", false)) {
+            addMimeType("dcf", "application/vnd.oma.drm.content");
+            addMimeType("dm", "application/vnd.oma.drm.message");
+        }
+        /// @}
     }
 
     /** @deprecated file types no longer exist */
@@ -228,7 +271,18 @@ public class MediaFile {
     }
 
     public static boolean isDrmMimeType(@Nullable String mimeType) {
-        return normalizeMimeType(mimeType).equals("application/x-android-drm-fl");
+        if (SystemProperties.getBoolean("ro.vendor.mtk_cta_set", false)) {
+            if (normalizeMimeType(mimeType).equals("cta/mudp")) {
+                return true;
+            }
+        }
+        if (SystemProperties.getBoolean("ro.vendor.mtk_oma_drm_support", false)) {
+            if (normalizeMimeType(mimeType).equals("application/vnd.oma.drm.content")
+                || normalizeMimeType(mimeType).equals("application/vnd.oma.drm.message")) {
+                return true;
+            }
+        }
+        return (normalizeMimeType(mimeType).equals("application/x-android-drm-fl"));
     }
 
     // generates a title based on file name
@@ -284,9 +338,14 @@ public class MediaFile {
         return getMimeTypeForFormatCode(formatCode);
     }
 
-    @UnsupportedAppUsage
+   @UnsupportedAppUsage
     public static @NonNull String getMimeTypeForFile(@Nullable String path) {
-        final String mimeType = MimeUtils.guessMimeTypeFromExtension(getFileExtension(path));
+        String ext = getFileExtension(path);
+        String mimeType = MimeUtils.guessMimeTypeFromExtension(getFileExtension(path));
+        if (mimeType != null) {
+          return mimeType;
+        }
+        mimeType = sMimeTypeMap.get(ext);
         return (mimeType != null) ? mimeType : MIME_TYPE_DEFAULT;
     }
 

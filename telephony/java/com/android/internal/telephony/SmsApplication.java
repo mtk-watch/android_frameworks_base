@@ -65,7 +65,10 @@ import java.util.function.Consumer;
 public final class SmsApplication {
     static final String LOG_TAG = "SmsApplication";
     private static final String PHONE_PACKAGE_NAME = "com.android.phone";
-    private static final String BLUETOOTH_PACKAGE_NAME = "com.android.bluetooth";
+    // MTK-START
+    // Modify visibility for the proprietary class
+    public static final String BLUETOOTH_PACKAGE_NAME = "com.android.bluetooth";
+    // MTK-END
     private static final String MMS_SERVICE_PACKAGE_NAME = "com.android.mms.service";
     private static final String TELEPHONY_PROVIDER_PACKAGE_NAME = "com.android.providers.telephony";
 
@@ -101,7 +104,10 @@ public final class SmsApplication {
         /**
          * The class name of the SMS_DELIVER_ACTION receiver in this app.
          */
-        private String mSmsReceiverClass;
+        // MTK-START
+        // Modify visibility for the proprietary class
+        public String mSmsReceiverClass;
+        // MTK-END
 
         /**
          * The class name of the WAP_PUSH_DELIVER_ACTION receiver in this app.
@@ -462,7 +468,10 @@ public final class SmsApplication {
      * (3) The currently configured highest priority broadcast receiver
      * (4) Null
      */
-    private static SmsApplicationData getApplication(Context context, boolean updateIfNeeded,
+    // MTK-START
+    // Modifiy visibility for the proprietary class
+    public static SmsApplicationData getApplication(Context context, boolean updateIfNeeded,
+    // MTK-END
             int userId) {
         TelephonyManager tm = (TelephonyManager)
                 context.getSystemService(Context.TELEPHONY_SERVICE);

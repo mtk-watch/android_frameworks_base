@@ -23,7 +23,6 @@ import static android.view.Display.INVALID_DISPLAY;
 import static com.android.server.am.ActivityManagerService.MY_PID;
 import static com.android.server.wm.ActivityStack.ActivityState.DESTROYED;
 import static com.android.server.wm.ActivityStack.ActivityState.DESTROYING;
-import static com.android.server.wm.ActivityStack.ActivityState.INITIALIZING;
 import static com.android.server.wm.ActivityStack.ActivityState.PAUSED;
 import static com.android.server.wm.ActivityStack.ActivityState.PAUSING;
 import static com.android.server.wm.ActivityStack.ActivityState.RESUMED;
@@ -87,9 +86,9 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     // all about the first app in the process
     final ApplicationInfo mInfo;
     final String mName;
-    final int mUid;
+    public final int mUid;
     // The process of this application; 0 if none
-    private volatile int mPid;
+    public volatile int mPid;
     // user of process.
     final int mUserId;
     // The owner of this window process controller object. Mainly for identification when we
@@ -546,14 +545,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
                 continue;
             }
             ActivityRecord topActivity = task.getTopActivity();
-            if (topActivity == null) {
-                continue;
-            }
-            // If an activity has just been started it will not yet be visible, but
-            // is expected to be soon. We treat this as if it were already visible.
-            // This ensures a subsequent activity can be started even before this one
-            // becomes visible.
-            if (topActivity.visible || topActivity.isState(INITIALIZING)) {
+            if (topActivity != null && topActivity.visible) {
                 return true;
             }
         }

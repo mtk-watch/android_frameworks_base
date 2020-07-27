@@ -28,6 +28,10 @@ import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Slog;
 
+/// M: [Debug] Enhance the location logs
+import com.android.server.LocationManagerService;
+/// M: mtk add end
+
 import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -58,7 +62,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class ComprehensiveCountryDetector extends CountryDetectorBase {
 
     private final static String TAG = "CountryDetector";
-    /* package */ static final boolean DEBUG = false;
+    /// M: [Debug] Enhance the location logs
+    /* package */ static final boolean DEBUG = LocationManagerService.D;
+    /// M: mtk add end
 
     /**
      * Max length of logs to maintain for debugging.
@@ -311,9 +317,12 @@ public class ComprehensiveCountryDetector extends CountryDetectorBase {
 
     void runAfterDetection(final Country country, final Country detectedCountry,
             final boolean notifyChange, final boolean startLocationBasedDetection) {
-        if (notifyChange) {
-            notifyIfCountryChanged(country, detectedCountry);
-        }
+        /// M: [Bug fix] Always notify because the country may be changed when app calls
+        //  detectCountry().
+        //if (notifyChange) {
+        notifyIfCountryChanged(country, detectedCountry);
+        //}
+        /// M: mtk add end
         if (DEBUG) {
             Slog.d(TAG, "startLocationBasedDetection=" + startLocationBasedDetection
                     + " detectCountry=" + (detectedCountry == null ? null :

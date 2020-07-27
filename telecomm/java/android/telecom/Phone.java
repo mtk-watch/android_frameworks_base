@@ -424,4 +424,14 @@ public final class Phone {
             }
         }
     }
+
+    /**
+     * M: Mediatek APIs related with call operations.
+     *
+     * @param params The bundle of operation parameters.
+     * @hide
+     */
+    public final void doMtkAction(Bundle params) {
+        mInCallAdapter.doMtkAction(params);
+    }
 }

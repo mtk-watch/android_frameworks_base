@@ -37,8 +37,12 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.util.AttributeSet;
 import android.util.Log;
+/// M: resolution tuner
+import com.mediatek.view.SurfaceExt;
+import com.mediatek.view.SurfaceFactory;
 
 import com.android.internal.view.SurfaceCallbackHelper;
 
@@ -99,7 +103,8 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallback {
     private static final String TAG = "SurfaceView";
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = SystemProperties.getBoolean(
+            "debug.surfaceview.log", false);
 
     @UnsupportedAppUsage
     final ArrayList<SurfaceHolder.Callback> mCallbacks
@@ -108,7 +113,13 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
     final int[] mLocation = new int[2];
 
     @UnsupportedAppUsage
-    final ReentrantLock mSurfaceLock = new ReentrantLock();
+    // M:@{
+    // Main thread is intermittently blocked so long time by SurfaceView thread and
+    // got starved. That is the reason why SurfaceView holds the Non-fair lock and
+    // is doing much work at that time. To avoid this problem, this patch makes
+    // SurfaceView used Fair lock.
+    final ReentrantLock mSurfaceLock = new ReentrantLock(true);
+    // @}
     @UnsupportedAppUsage
     final Surface mSurface = new Surface();       // Current surface in use
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
@@ -136,6 +147,11 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     boolean mIsCreating = false;
     private volatile boolean mRtHandlingPositionUpdates = false;
+
+    /// M: add for resolution tuner @{
+    private SurfaceExt mSurfaceExt = SurfaceFactory.getInstance().getSurfaceExt();
+    private boolean isUseResolutiontuner = false;
+    /// @}
 
     private final ViewTreeObserver.OnScrollChangedListener mScrollChangedListener
             = new ViewTreeObserver.OnScrollChangedListener() {
@@ -218,6 +234,9 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
         mRenderNode.addPositionUpdateListener(mPositionListener);
 
         setWillNotDraw(true);
+        /// M: add for resolution tuner @{
+        mSurfaceExt.initResolutionTunner();
+        /// @}
     }
 
     /**
@@ -237,6 +256,10 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
     /** @hide */
     @Override
     public void windowStopped(boolean stopped) {
+        if (DEBUG) {
+            Log.i(TAG, "windowStopped,mWindowStopped:" + mWindowStopped
+                    + ",stopped:" + stopped);
+        }
         mWindowStopped = stopped;
         updateRequestedVisibility();
         updateSurface();
@@ -245,6 +268,9 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        if (DEBUG) {
+            Log.i(TAG, "onAttachedToWindow");
+        }
 
         getViewRootImpl().addWindowStoppedCallback(this);
         mWindowStopped = false;
@@ -320,6 +346,9 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
         // the SurfaceHolder forward, most live wallpapers do it.
         if (viewRoot != null) {
             viewRoot.removeWindowStoppedCallback(this);
+        }
+        if (DEBUG) {
+            Log.i(TAG, "onDetachedFromWindow");
         }
 
         mAttachedToWindow = false;
@@ -561,6 +590,16 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
         if (myWidth <= 0) myWidth = getWidth();
         int myHeight = mRequestedHeight;
         if (myHeight <= 0) myHeight = getHeight();
+        /// M: add for resolution tuner @{
+        if (myWidth>200 && myHeight>200 && mSurfaceExt.isResolutionTuningPackage()) {
+            Log.i(TAG, "updateSurface,myWidth=" + myWidth + ",myHeight=" + myHeight
+                    + ",xScale=" + mSurfaceExt.getXScale()
+                    + ",yScale="+ mSurfaceExt.getYScale());
+            myWidth = (int)(myWidth / mSurfaceExt.getXScale());
+            myHeight = (int)(myHeight / mSurfaceExt.getYScale());
+            isUseResolutiontuner = true;
+        }
+        /// @}
 
         final boolean formatChanged = mFormat != mRequestedFormat;
         final boolean visibleChanged = mVisible != mRequestedVisible;
@@ -714,6 +753,11 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
                             for (SurfaceHolder.Callback c : callbacks) {
                                 c.surfaceDestroyed(mSurfaceHolder);
                             }
+                            /// M: add for resolution tuner @{
+                            if (isUseResolutiontuner) {
+                                getViewRootImpl().setSurfaceViewCreated(false);
+                            }
+                            /// @}
                             // Since Android N the same surface may be reused and given to us
                             // again by the system server at a later point. However
                             // as we didn't do this in previous releases, clients weren't
@@ -757,6 +801,11 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
                             for (SurfaceHolder.Callback c : callbacks) {
                                 c.surfaceCreated(mSurfaceHolder);
                             }
+                            /// M: add for resolution tuner @{
+                            if (isUseResolutiontuner) {
+                                getViewRootImpl().setSurfaceViewCreated(true);
+                            }
+                            /// @}
                         }
                         if (creating || formatChanged || sizeChanged
                                 || visibleChanged || realSizeChanged) {
@@ -1179,6 +1228,10 @@ public class SurfaceView extends View implements ViewRootImpl.WindowStoppedCallb
          */
         @Override
         public void unlockCanvasAndPost(Canvas canvas) {
+            if (DEBUG) {
+                Log.i(TAG, System.identityHashCode(this) + "[unlockCanvasAndPost] canvas:"
+                        + canvas);
+            }
             mSurface.unlockCanvasAndPost(canvas);
             mSurfaceLock.unlock();
         }

@@ -67,6 +67,7 @@ bool SkiaPipeline::pinImages(std::vector<SkImage*>& mutableImages) {
 }
 
 void SkiaPipeline::unpinImages() {
+    TIME_LOG_CALL();
     for (auto& image : mPinnedImages) {
         SkImage_unpinAsTexture(image.get(), mRenderThread.getGrContext());
     }
@@ -249,6 +250,7 @@ SkCanvas* SkiaPipeline::tryCapture(SkSurface* surface) {
             }
         }
         if (mCaptureSequence > 0 || mPictureCapturedCallback) {
+            TIME_LOG_CALL();
             mRecorder.reset(new SkPictureRecorder());
             SkCanvas* pictureCanvas =
                     mRecorder->beginRecording(surface->width(), surface->height(), nullptr,
@@ -341,7 +343,7 @@ void SkiaPipeline::renderFrameImpl(const LayerUpdateQueue& layers, const SkRect&
     if (!opaque || getSurfaceColorType() == kRGBA_F16_SkColorType) {
         canvas->clear(SK_ColorTRANSPARENT);
     }
-
+    TIME_LOG_CALL();
     if (1 == nodes.size()) {
         if (!nodes[0]->nothingToDraw()) {
             RenderNodeDrawable root(nodes[0].get(), canvas);

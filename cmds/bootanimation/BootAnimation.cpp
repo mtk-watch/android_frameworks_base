@@ -268,6 +268,7 @@ status_t BootAnimation::initTexture(FileMap* map, int* width, int* height)
 }
 
 status_t BootAnimation::readyToRun() {
+    SurfaceComposerClient::Transaction t;
     mAssets.addDefaultAssets();
 
     mDisplayToken = SurfaceComposerClient::getInternalDisplayToken();
@@ -279,11 +280,15 @@ status_t BootAnimation::readyToRun() {
     if (status)
         return -1;
 
+    /// M: The tablet rotation maybe 90/270 degrees, so set the lcm config for tablet
+    t.setDisplayProjection(mDisplayToken, DisplayState::eOrientationDefault,
+        Rect(dinfo.w, dinfo.h), Rect(dinfo.w, dinfo.h));
+    t.apply();
+
     // create the native surface
     sp<SurfaceControl> control = session()->createSurface(String8("BootAnimation"),
             dinfo.w, dinfo.h, PIXEL_FORMAT_RGB_565);
 
-    SurfaceComposerClient::Transaction t;
     t.setLayer(control, 0x40000000)
         .apply();
 

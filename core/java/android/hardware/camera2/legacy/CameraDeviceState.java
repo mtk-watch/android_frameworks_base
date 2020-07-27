@@ -41,7 +41,9 @@ import android.util.Log;
  */
 public class CameraDeviceState {
     private static final String TAG = "CameraDeviceState";
-    private static final boolean DEBUG = false;
+    //!++
+    private static final boolean DEBUG = ParameterUtils.DEBUG;
+    //!--
 
     private static final int STATE_ERROR = 0;
     private static final int STATE_UNCONFIGURED = 1;
@@ -250,6 +252,12 @@ public class CameraDeviceState {
         doStateTransition(newState, /*timestamp*/0, NO_CAPTURE_ERROR);
     }
 
+    //!++
+    protected synchronized int getCurrentState() {
+        return mCurrentState;
+    }
+    //!--
+
     private void doStateTransition(int newState, final long timestamp, final int error) {
         if (newState != mCurrentState) {
             String stateName = "UNKNOWN";
@@ -305,6 +313,16 @@ public class CameraDeviceState {
                 break;
             case STATE_IDLE:
                 if (mCurrentState == STATE_IDLE) {
+                    //!++
+                    if (mCurrentHandler != null && mCurrentListener != null) {
+                        mCurrentHandler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                mCurrentListener.onIdle();
+                            }
+                        });
+                    }
+                    //!--
                     break;
                 }
 

@@ -94,7 +94,8 @@ public class AudioManager {
     private final boolean mUseVolumeKeySounds;
     private final boolean mUseFixedVolume;
     private static final String TAG = "AudioManager";
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = "eng".equals(Build.TYPE)
+        || "userdebug".equals(Build.TYPE);
     private static final AudioPortEventHandler sAudioPortEventHandler = new AudioPortEventHandler();
     private static final AudioVolumeGroupChangeHandler sAudioAudioVolumeGroupChangedHandler =
             new AudioVolumeGroupChangeHandler();
@@ -1461,6 +1462,9 @@ public class AudioManager {
      *           <var>false</var> to turn it off
      */
     public void setSpeakerphoneOn(boolean on){
+        if (DEBUG) {
+            Log.d(TAG, "setSpeakerphoneOn(" + on + ")");
+        }
         final IAudioService service = getService();
         try {
             service.setSpeakerphoneOn(on);
@@ -1691,6 +1695,9 @@ public class AudioManager {
      */
     public void startBluetoothSco(){
         final IAudioService service = getService();
+        if (DEBUG) {
+            Log.d(TAG, "startBluetoothSco()");
+        }
         try {
             service.startBluetoothSco(mICallBack,
                     getContext().getApplicationInfo().targetSdkVersion);
@@ -1716,6 +1723,9 @@ public class AudioManager {
      */
     @UnsupportedAppUsage
     public void startBluetoothScoVirtualCall() {
+        if (DEBUG) {
+            Log.d(TAG, "startBluetoothScoVirtualCall()");
+        }
         final IAudioService service = getService();
         try {
             service.startBluetoothScoVirtualCall(mICallBack);
@@ -1735,6 +1745,9 @@ public class AudioManager {
      */
     // Also used for connections started with {@link #startBluetoothScoVirtualCall()}
     public void stopBluetoothSco(){
+        if (DEBUG) {
+            Log.d(TAG, "stopBluetoothSco()");
+        }
         final IAudioService service = getService();
         try {
             service.stopBluetoothSco(mICallBack);
@@ -1753,6 +1766,9 @@ public class AudioManager {
      *               <var>false</var> to not use bluetooth SCO for communications
      */
     public void setBluetoothScoOn(boolean on){
+        if (DEBUG) {
+            Log.d(TAG, "setBluetoothScoOn(" + on + ")");
+        }
         final IAudioService service = getService();
         try {
             service.setBluetoothScoOn(on);
@@ -1769,8 +1785,13 @@ public class AudioManager {
      */
     public boolean isBluetoothScoOn() {
         final IAudioService service = getService();
+        boolean mBTScoStatus = false;
         try {
-            return service.isBluetoothScoOn();
+            mBTScoStatus = service.isBluetoothScoOn();
+            if (DEBUG) {
+                Log.d(TAG, "isBluetoothScoOn()=" + mBTScoStatus);
+            }
+            return mBTScoStatus;
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1847,6 +1868,9 @@ public class AudioManager {
      *           <var>false</var> to turn mute off
      */
     public void setMicrophoneMute(boolean on) {
+        if (DEBUG) {
+            Log.d(TAG, "setMicrophoneMute(" + on + ")");
+        }
         final IAudioService service = getService();
         try {
             service.setMicrophoneMute(on, getContext().getOpPackageName(),
@@ -1912,6 +1936,9 @@ public class AudioManager {
      */
     public void setMode(int mode) {
         final IAudioService service = getService();
+        if (DEBUG) {
+            Log.d(TAG, "setMode(" + mode + ")");
+        }
         try {
             service.setMode(mode, mICallBack, mApplicationContext.getOpPackageName());
         } catch (RemoteException e) {
@@ -2495,6 +2522,9 @@ public class AudioManager {
                                 final RecordConfigChangeCallbackData cbData =
                                         (RecordConfigChangeCallbackData) msg.obj;
                                 if (cbData.mCb != null) {
+                                    if (DEBUG) {
+                                        Log.d(TAG, "dispatching onRecordingConfigChanged()");
+                                    }
                                     cbData.mCb.onRecordingConfigChanged(cbData.mConfigs);
                                 }
                             } break;
@@ -2673,6 +2703,12 @@ public class AudioManager {
                             .setInternalLegacyStreamType(streamType).build(),
                     durationHint,
                     0 /* flags, legacy behavior */);
+            if (DEBUG) {
+                Log.d(TAG, "requestAudioFocus() from " + l
+                + ", streamType=" + streamType
+                + ", durationHint=" + durationHint
+                + "guaranteedstatus=" + status);
+            }
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "Audio focus request denied due to ", e);
         }
@@ -3183,6 +3219,11 @@ public class AudioManager {
                     "receiver and context package names don't match");
             return;
         }
+        if (DEBUG) {
+            Log.d(TAG, "registerMediaButtonEventReceiver() "
+            + ", eventReceiver=" + eventReceiver
+            + "packageName=" + eventReceiver.getPackageName());
+        }
         // construct a PendingIntent for the media button and register it
         Intent mediaButtonIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
         //     the associated intent will be handled by the component being registered
@@ -3235,6 +3276,11 @@ public class AudioManager {
     public void unregisterMediaButtonEventReceiver(ComponentName eventReceiver) {
         if (eventReceiver == null) {
             return;
+        }
+        if (DEBUG) {
+            Log.d(TAG, "unregisterMediaButtonEventReceiver() "
+            + ", eventReceiver=" + eventReceiver
+            + "packageName=" + eventReceiver.getPackageName());
         }
         // construct a PendingIntent for the media button and unregister it
         Intent mediaButtonIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
@@ -4190,6 +4236,13 @@ public class AudioManager {
     public void setWiredDeviceConnectionState(int type, int state, String address, String name) {
         final IAudioService service = getService();
         try {
+            if (DEBUG) {
+                Log.d(TAG, "setWiredDeviceConnectionState()"
+                + ", type=" + type
+                + ", state=" + state
+                + ", address=" + address
+                + ", name=" + name);
+            }
             service.setWiredDeviceConnectionState(type, state, address, name,
                     mApplicationContext.getOpPackageName());
         } catch (RemoteException e) {
@@ -4379,6 +4432,10 @@ public class AudioManager {
      */
     public void setVolumeController(IVolumeController controller) {
         try {
+            if (DEBUG) {
+                Log.d(TAG, "setVolumeController()"
+                + ", controller=" + controller);
+            }
             getService().setVolumeController(controller);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
@@ -4442,6 +4499,10 @@ public class AudioManager {
     @UnsupportedAppUsage
     public void setRingerModeInternal(int ringerMode) {
         try {
+            if (DEBUG) {
+                Log.d(TAG, "setRingerModeInternal()"
+                + ", ringerMode=" + ringerMode);
+            }
             getService().setRingerModeInternal(ringerMode, getContext().getOpPackageName());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
@@ -4467,6 +4528,10 @@ public class AudioManager {
      */
     public void setVolumePolicy(VolumePolicy policy) {
         try {
+            if (DEBUG) {
+                Log.d(TAG, "setVolumePolicy()"
+                + ", VolumePolicy=" + policy);
+            }
             getService().setVolumePolicy(policy);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
@@ -4482,6 +4547,10 @@ public class AudioManager {
      */
     public int setHdmiSystemAudioSupported(boolean on) {
         try {
+            if (DEBUG) {
+                Log.d(TAG, "setHdmiSystemAudioSupported("
+                + on + ")");
+            }
             return getService().setHdmiSystemAudioSupported(on);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
@@ -4628,6 +4697,9 @@ public class AudioManager {
     public static int createAudioPatch(AudioPatch[] patch,
                                  AudioPortConfig[] sources,
                                  AudioPortConfig[] sinks) {
+        if (DEBUG) {
+            Log.d(TAG, "createAudioPatch()");
+        }
         return AudioSystem.createAudioPatch(patch, sources, sinks);
     }
 
@@ -4644,6 +4716,9 @@ public class AudioManager {
      */
     @UnsupportedAppUsage
     public static int releaseAudioPatch(AudioPatch patch) {
+        if (DEBUG) {
+            Log.d(TAG, "createAudioPatch()");
+        }
         return AudioSystem.releaseAudioPatch(patch);
     }
 
@@ -4665,6 +4740,10 @@ public class AudioManager {
     public static int setAudioPortGain(AudioPort port, AudioGainConfig gain) {
         if (port == null || gain == null) {
             return ERROR_BAD_VALUE;
+        }
+        if (DEBUG) {
+            Log.d(TAG, "setAudioPortGain() port=" + port
+            + ",gain=" + gain);
         }
         AudioPortConfig activeConfig = port.activeConfig();
         AudioPortConfig config = new AudioPortConfig(port, activeConfig.samplingRate(),

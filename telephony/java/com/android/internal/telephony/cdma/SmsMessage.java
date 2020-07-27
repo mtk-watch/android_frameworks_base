@@ -91,7 +91,7 @@ public class SmsMessage extends SmsMessageBase {
      *  Here, the error class is defined by the bits from 9-8, the status code by the bits from 7-0.
      *  See C.S0015-B, v2.0, 4.5.21 for a detailed description of possible values.
      */
-    private int status;
+    public int status;
 
     /** Specifies if a return of an acknowledgment is requested for send SMS */
     private static final int RETURN_NO_ACK  = 0;
@@ -106,8 +106,8 @@ public class SmsMessage extends SmsMessageBase {
     private static final int PRIORITY_URGENT        = 0x2;
     private static final int PRIORITY_EMERGENCY     = 0x3;
 
-    private SmsEnvelope mEnvelope;
-    private BearerData mBearerData;
+    public SmsEnvelope mEnvelope;
+    public BearerData mBearerData;
 
     /** @hide */
     public SmsMessage(SmsAddress addr, SmsEnvelope env) {
@@ -392,7 +392,13 @@ public class SmsMessage extends SmsMessageBase {
     /** Return true iff the bearer data message type is DELIVERY_ACK. */
     @Override
     public boolean isStatusReportMessage() {
+        // MTK-START: mBearerData may be null
+        /*
         return (mBearerData.messageType == BearerData.MESSAGE_TYPE_DELIVERY_ACK);
+        */
+        return ((mBearerData != null) &&
+                mBearerData.messageType == BearerData.MESSAGE_TYPE_DELIVERY_ACK);
+        // MTK-END
     }
 
     /**
@@ -531,7 +537,7 @@ public class SmsMessage extends SmsMessageBase {
     /**
      * Decodes 3GPP2 sms stored in CSIM/RUIM cards As per 3GPP2 C.S0015-0
      */
-    private void parsePduFromEfRecord(byte[] pdu) {
+    public void parsePduFromEfRecord(byte[] pdu) {
         ByteArrayInputStream bais = new ByteArrayInputStream(pdu);
         DataInputStream dis = new DataInputStream(bais);
         SmsEnvelope env = new SmsEnvelope();
@@ -694,6 +700,11 @@ public class SmsMessage extends SmsMessageBase {
                       HexDump.toHexString(mEnvelope.bearerData) + "'");
             Rlog.d(LOG_TAG, "MT (decoded) BearerData = " + mBearerData);
         }
+        // MTK-START: mBearerData may be null
+        if (mBearerData == null) {
+            return;
+        }
+        // MTK-END
         mMessageRef = mBearerData.messageId;
         if (mBearerData.userData != null) {
             mUserData = mBearerData.userData.payload;
@@ -764,7 +775,12 @@ public class SmsMessage extends SmsMessageBase {
      * @param plmn the PLMN for a broadcast SMS
      */
     public SmsCbMessage parseBroadcastSms(String plmn) {
+        // MTK-START: Add hook function to decode broadcast SMS.
+        /*
         BearerData bData = BearerData.decode(mEnvelope.bearerData, mEnvelope.serviceCategory);
+        */
+        BearerData bData = onDecodeBroadcastSms();
+        // MTK-END
         if (bData == null) {
             Rlog.w(LOG_TAG, "BearerData.decode() returned null");
             return null;
@@ -787,7 +803,12 @@ public class SmsMessage extends SmsMessageBase {
      */
     @Override
     public SmsConstants.MessageClass getMessageClass() {
+        // MTK-START: mBearerData may be null
+        /*
         if (BearerData.DISPLAY_MODE_IMMEDIATE == mBearerData.displayMode ) {
+        */
+        if (mBearerData != null && BearerData.DISPLAY_MODE_IMMEDIATE == mBearerData.displayMode) {
+        // MTK-END
             return SmsConstants.MessageClass.CLASS_0;
         } else {
             return SmsConstants.MessageClass.UNKNOWN;
@@ -826,7 +847,7 @@ public class SmsMessage extends SmsMessageBase {
      * Creates BearerData and Envelope from parameters for a Submit SMS.
      * @return byte stream for SubmitPdu.
      */
-    private static SubmitPdu privateGetSubmitPdu(String destAddrStr, boolean statusReportRequested,
+    public static SubmitPdu privateGetSubmitPdu(String destAddrStr, boolean statusReportRequested,
             UserData userData) {
         return privateGetSubmitPdu(destAddrStr, statusReportRequested, userData, -1);
     }
@@ -855,6 +876,12 @@ public class SmsMessage extends SmsMessageBase {
         CdmaSmsAddress destAddr = CdmaSmsAddress.parse(
                 PhoneNumberUtils.cdmaCheckAndProcessPlusCodeForSms(destAddrStr));
         if (destAddr == null) return null;
+        // MTK-START
+        if (destAddr.numberOfDigits > CdmaSmsAddress.SMS_ADDRESS_MAX) {
+            Rlog.d(LOG_TAG, "number of digit exceeds the SMS_ADDRESS_MAX");
+            return null;
+        }
+        // MTK-END
 
         BearerData bearerData = new BearerData();
         bearerData.messageType = BearerData.MESSAGE_TYPE_SUBMIT;
@@ -1012,7 +1039,12 @@ public class SmsMessage extends SmsMessageBase {
      * @hide
      */
     public int getNumOfVoicemails() {
+        // MTK-START: mBearerData may be null
+        /*
         return mBearerData.numberOfMessages;
+        */
+        return (mBearerData != null) ? mBearerData.numberOfMessages : 0;
+        // MTK-END
     }
 
     /**
@@ -1044,6 +1076,22 @@ public class SmsMessage extends SmsMessageBase {
      * @hide
      */
     public ArrayList<CdmaSmsCbProgramData> getSmsCbProgramData() {
+        // MTK-START: mBearerData may be null
+        /*
         return mBearerData.serviceCategoryProgramData;
+        */
+        return (mBearerData != null) ? mBearerData.serviceCategoryProgramData : null;
+        // MTK-END
     }
+
+    // MTK-START
+    /**
+     * Hook function to decode broadcast SMS.
+     *
+     * @return BearerData Object
+     */
+    protected BearerData onDecodeBroadcastSms() {
+        return BearerData.decode(mEnvelope.bearerData, mEnvelope.serviceCategory);
+    }
+    // MTK-END
 }

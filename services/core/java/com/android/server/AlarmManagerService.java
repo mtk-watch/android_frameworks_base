@@ -124,7 +124,7 @@ import java.util.function.Predicate;
  * Unit test:
  atest $ANDROID_BUILD_TOP/frameworks/base/services/tests/servicestests/src/com/android/server/AlarmManagerServiceTest.java
  */
-class AlarmManagerService extends SystemService {
+public class AlarmManagerService extends SystemService {
     private static final int RTC_WAKEUP_MASK = 1 << RTC_WAKEUP;
     private static final int RTC_MASK = 1 << RTC;
     private static final int ELAPSED_REALTIME_WAKEUP_MASK = 1 << ELAPSED_REALTIME_WAKEUP;
@@ -135,8 +135,8 @@ class AlarmManagerService extends SystemService {
     // Mask for testing whether a given alarm type is wakeup vs non-wakeup
     static final int TYPE_NONWAKEUP_MASK = 0x1; // low bit => non-wakeup
 
-    static final String TAG = "AlarmManager";
-    static final boolean localLOGV = false;
+    protected static final String TAG = "AlarmManager";
+    protected static final boolean localLOGV = false;
     static final boolean DEBUG_BATCH = localLOGV || false;
     static final boolean DEBUG_VALIDATE = localLOGV || false;
     static final boolean DEBUG_ALARM_CLOCK = localLOGV || false;
@@ -160,7 +160,7 @@ class AlarmManagerService extends SystemService {
 
     private final Intent mBackgroundIntent
             = new Intent().addFlags(Intent.FLAG_FROM_BACKGROUND);
-    static final IncreasingTimeOrder sIncreasingTimeOrder = new IncreasingTimeOrder();
+    protected static final IncreasingTimeOrder sIncreasingTimeOrder = new IncreasingTimeOrder();
 
     static final boolean WAKEUP_STATS = false;
 
@@ -194,7 +194,8 @@ class AlarmManagerService extends SystemService {
     private final long[] mTickHistory = new long[TICK_HISTORY_DEPTH];
     private int mNextTickHistory;
 
-    private final Injector mInjector;
+    //M: [Power off Alarm] change injector access to protected to get native data
+    protected final Injector mInjector;
     int mBroadcastRefCount = 0;
     PowerManager.WakeLock mWakeLock;
     SparseIntArray mAlarmsPerUid = new SparseIntArray();
@@ -685,7 +686,7 @@ class AlarmManagerService extends SystemService {
     final LinkedList<WakeupEvent> mRecentWakeups = new LinkedList<WakeupEvent>();
     final long RECENT_WAKEUP_PERIOD = 1000L * 60 * 60 * 24; // one day
 
-    final class Batch {
+    public final class Batch {
         long start;     // These endpoints are always in ELAPSED
         long end;
         int flags;      // Flags for alarms, such as FLAG_STANDALONE.
@@ -702,7 +703,7 @@ class AlarmManagerService extends SystemService {
             }
         }
 
-        int size() {
+        public int size() {
             return alarms.size();
         }
 
@@ -928,6 +929,32 @@ class AlarmManagerService extends SystemService {
     Alarm mPendingIdleUntil = null;
     Alarm mNextWakeFromIdle = null;
     ArrayList<Alarm> mPendingWhileIdleAlarms = new ArrayList<>();
+    /// M: added for powerOffAlarm feature @{
+    protected boolean isPowerOffAlarmType(int type){
+        return false;
+    }
+
+    protected boolean schedulePoweroffAlarm(int type,long triggerAtTime,long interval,
+        PendingIntent operation,IAlarmListener directReceiver,
+        String listenerTag,WorkSource workSource,AlarmManager.AlarmClockInfo alarmClock,
+        String callingPackage){
+        return true;
+    }
+
+    protected void updatePoweroffAlarmtoNowRtc(){
+    }
+
+    public void cancelPoweroffAlarmImpl(String name) {
+    }
+    ///@}
+
+    /// M: For handling non-wakeup alarms while WFD is connected
+    protected void registerWFDStatusChangeReciever(){
+    }
+    protected boolean isWFDConnected(){
+        return false;
+    }
+    ///@}
 
     @VisibleForTesting
     AlarmManagerService(Context context, Injector injector) {
@@ -935,7 +962,8 @@ class AlarmManagerService extends SystemService {
         mInjector = injector;
     }
 
-    AlarmManagerService(Context context) {
+    //M: change default to public to implement MtkAlarmManagerService service
+    public AlarmManagerService(Context context) {
         this(context, new Injector(context));
     }
 
@@ -1517,6 +1545,9 @@ class AlarmManagerService extends SystemService {
             if (mInjector.getCurrentTimeMillis() < systemBuildTime) {
                 Slog.i(TAG, "Current time only " + mInjector.getCurrentTimeMillis()
                         + ", advancing to build time " + systemBuildTime);
+                /// M: For handling non-wakeup alarms while WFD is connected
+                registerWFDStatusChangeReciever();
+                ///@}
                 mInjector.setKernelTime(systemBuildTime);
             }
 
@@ -1724,7 +1755,9 @@ class AlarmManagerService extends SystemService {
         }
 
         if (type < RTC_WAKEUP || type > ELAPSED_REALTIME) {
+            if(!isPowerOffAlarmType(type)){
             throw new IllegalArgumentException("Invalid alarm type " + type);
+        }
         }
 
         if (triggerAtTime < 0) {
@@ -1733,6 +1766,19 @@ class AlarmManagerService extends SystemService {
                     + " pid=" + what);
             triggerAtTime = 0;
         }
+
+        /// M: added for powerOffAlarm feature @{
+        if(!schedulePoweroffAlarm(type,triggerAtTime,interval,operation,directReceiver,
+            listenerTag,workSource,alarmClock,callingPackage)){
+            return;
+        }
+        ///@}
+
+        /// M: update for powerOffAlarm feature issue  @{
+        if(isPowerOffAlarmType(type)) {
+            type=RTC_WAKEUP;
+        }
+        ///@}
 
         final long nowElapsed = mInjector.getElapsedRealtime();
         final long nominalTrigger = convertToElapsed(triggerAtTime, type);
@@ -2154,7 +2200,12 @@ class AlarmManagerService extends SystemService {
         public long getNextWakeFromIdleTime() {
             return getNextWakeFromIdleTimeImpl();
         }
-
+        /// M: added for powerOffAlarm feature @{
+        @Override
+        public void cancelPoweroffAlarm(String name) {
+            cancelPoweroffAlarmImpl(name);
+        }
+        ///@}
         @Override
         public AlarmManager.AlarmClockInfo getNextAlarmClock(int userId) {
             userId = ActivityManager.handleIncomingUser(Binder.getCallingPid(),
@@ -3442,7 +3493,7 @@ class AlarmManagerService extends SystemService {
 
     private static native long init();
     private static native void close(long nativeData);
-    private static native int set(long nativeData, int type, long seconds, long nanoseconds);
+    protected static native int set(long nativeData, int type, long seconds, long nanoseconds);
     private static native int waitForAlarm(long nativeData);
     private static native int setKernelTime(long nativeData, long millis);
     private static native int setKernelTimezone(long nativeData, int minuteswest);
@@ -3603,7 +3654,8 @@ class AlarmManagerService extends SystemService {
     }
 
     @VisibleForTesting
-    static class Alarm {
+    //M: [ALPS04304336] change access to public for Dura Speed/ Data Shaping
+    public static class Alarm {
         public final int type;
         public final long origWhen;
         public final boolean wakeup;
@@ -3804,6 +3856,11 @@ class AlarmManagerService extends SystemService {
         if (mInteractive) {
             return false;
         }
+        /// M: For handling non-wakeup alarms while WFD is connected
+        if(isWFDConnected()) {
+            return false;
+        }
+        ///@}
         if (mLastAlarmDeliveryTime <= 0) {
             return false;
         }
@@ -3827,6 +3884,9 @@ class AlarmManagerService extends SystemService {
             } else {
               Trace.traceBegin(Trace.TRACE_TAG_POWER, "Dispatch non-wakeup alarm to " + alarm.packageName);
             }
+            /// M: added for powerOffAlarm feature @{
+            updatePoweroffAlarmtoNowRtc();
+            ///@}
             try {
                 if (localLOGV) {
                     Slog.v(TAG, "sending alarm " + alarm);
@@ -3850,7 +3910,7 @@ class AlarmManagerService extends SystemService {
     }
 
     @VisibleForTesting
-    static class Injector {
+    protected static class Injector {
         private long mNativeData;
         private Context mContext;
 
@@ -3860,6 +3920,11 @@ class AlarmManagerService extends SystemService {
 
         void init() {
             mNativeData = AlarmManagerService.init();
+        }
+
+        //M: [Power off Alarm] expose API for MtkAlarmManager Service
+        public long getNativeData() {
+            return mNativeData;
         }
 
         int waitForAlarm() {

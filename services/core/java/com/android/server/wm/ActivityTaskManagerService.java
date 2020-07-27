@@ -268,6 +268,13 @@ import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.uri.UriGrantsManagerInternal;
 import com.android.server.vr.VrManagerInternal;
 
+/// M: MTK AmsExt
+import com.mediatek.server.am.AmsExt;
+
+/// M: MtkSystemServer
+import com.mediatek.server.MtkSystemServer;
+import com.mediatek.server.MtkSystemServiceFactory;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileDescriptor;
@@ -646,6 +653,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     private FontScaleSettingObserver mFontScaleSettingObserver;
 
     private int mDeviceOwnerUid = Process.INVALID_UID;
+
+    /// M: MTK AMS
+    public AmsExt mAmsExt = MtkSystemServiceFactory.getInstance().makeAmsExt();
 
     private final class FontScaleSettingObserver extends ContentObserver {
         private final Uri mFontScaleUri = Settings.System.getUriFor(FONT_SCALE);
@@ -1038,6 +1048,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             Intent intent, String resolvedType, IBinder resultTo, String resultWho, int requestCode,
             int startFlags, ProfilerInfo profilerInfo, Bundle bOptions, int userId,
             boolean validateIncomingUser) {
+        if (mAmsExt.preLaunchApplication(callingPackage, intent, resolvedType, startFlags)) {
+            return ActivityManager.START_SUCCESS;
+        }
         enforceNotIsolatedCaller("startActivityAsUser");
 
         userId = getActivityStartController().checkTargetUser(userId, validateIncomingUser,
@@ -1665,6 +1678,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 if (stopProfiling && proc != null) {
                     proc.clearProfilerIfNeeded();
                 }
+                /// M: onEndOfActivityIdle @{
+                mAmsExt.onEndOfActivityIdle(mContext, r.intent);
+                /// M: onAfterActivityResumed @}
             }
         } finally {
             Binder.restoreCallingIdentity(origId);
@@ -5408,6 +5424,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     void enableScreenAfterBoot(boolean booted) {
         EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_ENABLE_SCREEN,
                 SystemClock.uptimeMillis());
+
         mWindowManager.enableScreenAfterBoot();
 
         synchronized (mGlobalLock) {
@@ -5591,6 +5608,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         if (updateOomAdj) {
             mH.post(mAmInternal::updateOomAdj);
         }
+
+        /// M: onUpdateSleep @{
+        mAmsExt.onUpdateSleep(wasSleeping, mSleeping);
+        /// @}
     }
 
     void updateOomAdj() {
@@ -6440,6 +6461,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             synchronized (mGlobalLock) {
                 EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_ENABLE_SCREEN,
                         SystemClock.uptimeMillis());
+
+                /// M: Boot time profiling @{
+                MtkSystemServer.getInstance().addBootEvent("AMS:ENABLE_SCREEN");
+                /// M: @}
+
                 mWindowManager.enableScreenAfterBoot();
                 updateEventDispatchingLocked(booted);
             }

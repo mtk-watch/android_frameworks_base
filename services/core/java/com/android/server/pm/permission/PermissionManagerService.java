@@ -48,6 +48,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.PermissionWhitelistFlags;
 import android.content.pm.PackageManagerInternal;
@@ -99,6 +100,9 @@ import com.android.server.pm.permission.PermissionManagerServiceInternal.Permiss
 import com.android.server.pm.permission.PermissionsState.PermissionState;
 import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.policy.SoftRestrictedPermissionPolicy;
+
+import com.mediatek.cta.CtaManager;
+import com.mediatek.cta.CtaManagerFactory;
 
 import libcore.util.EmptyArray;
 
@@ -334,15 +338,30 @@ public class PermissionManagerService {
                 mPackageManagerInt.getInstantAppPackageName(uid) != null;
         final int userId = UserHandle.getUserId(uid);
         if (!mUserManagerInt.exists(userId)) {
+            /// M: CTA requirement - permission control @{
+            Slog.d(TAG, "Permission Denied: checkUidPermission, not exits, userId: " + userId
+                    + ", permName: " + permName + ", pkgName: " + pkg.packageName
+                    + ", uid: " + uid + ", callingUid: " + callingUid);
+            /// @}
             return PackageManager.PERMISSION_DENIED;
         }
 
         if (pkg != null) {
             if (pkg.mSharedUserId != null) {
                 if (isCallerInstantApp) {
+                    /// M: CTA requirement - permission control @{
+                    Slog.d(TAG, "Permission Denied: checkUidPermission, isCallerInstantApp"
+                            + ", permName: " + permName + ", pkgName: " + pkg.packageName
+                            + ", uid: " + uid + ", callingUid: " + callingUid);
+                    /// @}
                     return PackageManager.PERMISSION_DENIED;
                 }
             } else if (mPackageManagerInt.filterAppAccess(pkg, callingUid, callingUserId)) {
+                /// M: CTA requirement - permission control @{
+                Slog.d(TAG, "Permission Denied: checkUidPermission, filterAppAccess"
+                        + ", permName: " + permName + ", pkgName: " + pkg.packageName
+                        + ", uid: " + uid + ", callingUid: " + callingUid);
+                /// @}
                 return PackageManager.PERMISSION_DENIED;
             }
             final PermissionsState permissionsState =
@@ -486,6 +505,11 @@ public class PermissionManagerService {
      */
     private static boolean isImpliedPermissionGranted(PermissionsState permissionsState,
             String permName, int userId) {
+        /// M: CTA requirement - permission control @{
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return false;
+        }
+        /// @}
         return FULLER_PERMISSION_MAP.containsKey(permName)
                 && permissionsState.hasPermission(FULLER_PERMISSION_MAP.get(permName), userId);
     }
@@ -926,6 +950,9 @@ public class PermissionManagerService {
             ArraySet<String> newImplicitPermissions = new ArraySet<>();
 
             final int N = pkg.requestedPermissions.size();
+            /// M: CTA requirement - permission control
+            boolean pkgReviewRequired = isPackageNeedsReview(pkg,  ps.getSharedUser());
+
             for (int i = 0; i < N; i++) {
                 final String permName = pkg.requestedPermissions.get(i);
                 final BasePermission bp = mSettings.getPermissionLocked(permName);
@@ -1128,7 +1155,13 @@ public class PermissionManagerService {
                                     }
 
                                     // Remove review flag as it is not necessary anymore
-                                    if ((flags & FLAG_PERMISSION_REVIEW_REQUIRED) != 0) {
+                                    if ((flags & FLAG_PERMISSION_REVIEW_REQUIRED) != 0
+                                            /// M: CTA requirement - permission control @{
+                                            && CtaManagerFactory.getInstance().makeCtaManager()
+                                                    .needClearReviewFlagAfterUpgrade(
+                                                            pkgReviewRequired,
+                                                            bp.getSourcePackageName(),
+                                                            bp.getName())) {
                                         flags &= ~FLAG_PERMISSION_REVIEW_REQUIRED;
                                         wasChanged = true;
                                     }
@@ -1146,6 +1179,25 @@ public class PermissionManagerService {
                                             }
                                         }
                                     }
+                                    /// M: CTA requirement - review UI for all apps  @{
+                                    if (CtaManagerFactory.getInstance().makeCtaManager()
+                                            .isPlatformPermission(bp.getSourcePackageName(),
+                                                    bp.getName())
+                                            && pkgReviewRequired) {
+                                        if ((flags & FLAG_PERMISSION_REVIEW_REQUIRED) == 0 &&
+                                              (flags & PackageManager.FLAG_PERMISSION_SYSTEM_FIXED)
+                                                   == 0) {
+                                            if (!bp.isRemoved()) {
+                                                if (packageOfInterest != null
+                                                        && packageOfInterest.equals(pkg.packageName)
+                                                        && !replace) {
+                                                    flags |= FLAG_PERMISSION_REVIEW_REQUIRED;
+                                                    wasChanged = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    ///@}
                                 } else {
                                     if (permState == null) {
                                         // New permission
@@ -1187,6 +1239,24 @@ public class PermissionManagerService {
                                             wasChanged = true;
                                         }
                                     }
+
+                                    /// M: CTA requirement - permission control @{
+                                    if (CtaManagerFactory.getInstance().makeCtaManager()
+                                            .isPlatformPermission(bp.getSourcePackageName(),
+                                                    bp.getName())
+                                            && pkgReviewRequired) {
+                                        if ((flags & FLAG_PERMISSION_REVIEW_REQUIRED) == 0) {
+                                            if (!bp.isRemoved()) {
+                                                if (packageOfInterest != null
+                                                        && packageOfInterest.equals(pkg.packageName)
+                                                        && !replace) {
+                                                    flags |= FLAG_PERMISSION_REVIEW_REQUIRED;
+                                                    wasChanged = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    ///@}
                                 }
 
                                 if (wasChanged) {
@@ -1917,18 +1987,29 @@ public class PermissionManagerService {
 
     private boolean isPermissionsReviewRequired(@NonNull PackageParser.Package pkg,
             @UserIdInt int userId) {
-        // Permission review applies only to apps not supporting the new permission model.
-        if (pkg.applicationInfo.targetSdkVersion >= Build.VERSION_CODES.M) {
+        // Legacy apps have the permission and get user consent on launch.
+        if (pkg == null || pkg.mExtras == null) {
             return false;
         }
 
-        // Legacy apps have the permission and get user consent on launch.
-        if (pkg.mExtras == null) {
+        /// M: CTA requirement - review UI for all apps @{
+        // Permission review applies only to apps not supporting the new permission model.
+        // CTA Decouple -- permission review @{
+        if (pkg.applicationInfo.targetSdkVersion >= Build.VERSION_CODES.M
+                /** M.@{ **/
+                && !CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()/** @} **/
+        ) {
             return false;
         }
+
         final PackageSetting ps = (PackageSetting) pkg.mExtras;
         final PermissionsState permissionsState = ps.getPermissionsState();
-        return permissionsState.isPermissionReviewRequired(userId);
+        boolean reviewRequired = permissionsState.isPermissionReviewRequired(userId);
+        return CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()
+                ? CtaManagerFactory.getInstance().makeCtaManager().isPermissionReviewRequired(
+                        pkg, userId, reviewRequired)
+                : reviewRequired;
+       ///@}
     }
 
     private boolean isPackageRequestingPermission(PackageParser.Package pkg, String permission) {
@@ -2189,6 +2270,11 @@ public class PermissionManagerService {
             break;
         }
 
+        /// M: CTA requirement - permission control @{
+        Slog.d(TAG, permName + " is granted, packageName: " + packageName + ", callingUid: "
+                + callingUid + ", userId: " + callingUid);
+        /// @}
+
         if (bp.isRuntime()) {
             logPermission(MetricsEvent.ACTION_PERMISSION_GRANTED, permName, packageName);
         }
@@ -2219,6 +2305,46 @@ public class PermissionManagerService {
         }
 
     }
+
+    /**M: ==========CTA requirement - review UI for all apps
+        the logic is the same with isPackageNeedsReview() of PMS==============@{**/
+    /**
+     * To check whether the passed in package needs permission review.
+     *
+     * @param  pkg Package information
+     * @param  settings Package related settings
+     * @return True indicates package needs permission review
+     */
+    public boolean isPackageNeedsReview(PackageParser.Package pkg, SharedUserSetting suid) {
+        if (!CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            return false;
+        }
+        final boolean appSupportsRuntimePermissions = pkg.applicationInfo.targetSdkVersion
+                >= Build.VERSION_CODES.M;
+        if (pkg.mSharedUserId != null) {
+            if (suid != null) {
+                for (PackageParser.Package pkg2: suid.getPackages()) {
+                    if (appSupportsRuntimePermissions) {
+                        if (isSystemApp(pkg2)) {
+                            return false;
+                        }
+                    } else {
+                        if (pkg2.applicationInfo.targetSdkVersion
+                                >= Build.VERSION_CODES.M) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        } else {
+            return (appSupportsRuntimePermissions && isSystemApp(pkg)) ? false : true;
+        }
+    }
+    private static boolean isSystemApp(PackageParser.Package pkg) {
+        return (pkg.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+    }
+    /**M: ==========CTA requirement - review UI for all apps==============@}**/
 
     private void revokeRuntimePermission(String permName, String packageName,
             boolean overridePolicy, int userId, PermissionCallback callback) {
@@ -2587,7 +2713,7 @@ public class PermissionManagerService {
 
         // Make sure all dynamic permissions have been assigned to a package,
         // and make sure there are no dangling permissions.
-        flags = updatePermissions(changingPkgName, changingPkg, flags);
+        flags = updatePermissions(changingPkgName, changingPkg, flags, callback);
 
         synchronized (mLock) {
             if (mBackgroundPermissions == null) {
@@ -2637,7 +2763,8 @@ public class PermissionManagerService {
         Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
     }
 
-    private int updatePermissions(String packageName, PackageParser.Package pkg, int flags) {
+    private int updatePermissions(String packageName, PackageParser.Package pkg, int flags,
+        @Nullable PermissionCallback callback) {
         Set<BasePermission> needsUpdate = null;
         synchronized (mLock) {
             final Iterator<BasePermission> it = mSettings.mPermissions.values().iterator();
@@ -2651,6 +2778,44 @@ public class PermissionManagerService {
                         && (pkg == null || !hasPermission(pkg, bp.getName()))) {
                         Slog.i(TAG, "Removing old permission tree: " + bp.getName()
                                 + " from package " + bp.getSourcePackageName());
+                        if (bp.isRuntime()) {
+                            final int[] userIds = mUserManagerInt.getUserIds();
+                            final int numUserIds = userIds.length;
+                            for (int userIdNum = 0; userIdNum < numUserIds; userIdNum++) {
+                                final int userId = userIds[userIdNum];
+
+                                mPackageManagerInt.forEachPackage((Package p) -> {
+                                            final String pName = p.packageName;
+                                            final ApplicationInfo appInfo =
+                                                    mPackageManagerInt.getApplicationInfo(pName, 0,
+                                                            Process.SYSTEM_UID, UserHandle.USER_SYSTEM);
+                                            if (appInfo != null
+                                                    && appInfo.targetSdkVersion < Build.VERSION_CODES.M) {
+                                                return;
+                                            }
+
+                                            final String permissionName = bp.getName();
+                                            if (checkPermission(permissionName, pName, Process.SYSTEM_UID,
+                                                    userId) == PackageManager.PERMISSION_GRANTED) {
+                                                try {
+                                                    revokeRuntimePermission(
+                                                            permissionName,
+                                                            pName,
+                                                            false,
+                                                            userId,
+                                                            callback);
+                                                } catch (IllegalArgumentException e) {
+                                                    Slog.e(TAG,
+                                                            "Failed to revoke "
+                                                                    + permissionName
+                                                                    + " from "
+                                                                    + pName,
+                                                            e);
+                                                }
+                                            }
+                                        });
+                            }
+                        }
                         flags |= UPDATE_PERMISSIONS_ALL;
                         it.remove();
                     }
@@ -2787,6 +2952,16 @@ public class PermissionManagerService {
             notifyRuntimePermissionStateChanged(packageName, userId);
         }
         if (permissionUpdated && callback != null) {
+            /// M: CTA requirement - permission request @{
+            // Update permission review cache for shared uid
+            if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()
+                        && (flagMask & PackageManager.FLAG_PERMISSION_REVIEW_REQUIRED) != 0
+                        && (flagValues & PackageManager.FLAG_PERMISSION_REVIEW_REQUIRED) == 0
+                        && pkg.mSharedUserId != null
+                        && !permissionsState.isPermissionReviewRequired(userId)) {
+                 permissionsState.updateReviewRequiredCache(userId);
+             }
+             ///@}
             // Install and runtime permissions are stored in different places,
             // so figure out what permission changed and persist the change.
             if (permissionsState.getInstallPermissionState(permName) != null) {
@@ -3035,6 +3210,10 @@ public class PermissionManagerService {
                 @NonNull int[] userIds, @Nullable List<String> permissions, int callingUid,
                 @PackageManager.PermissionWhitelistFlags int whitelistFlags,
                 @NonNull PermissionCallback callback) {
+            /// M: CTA requirement - permission control @{
+            Slog.d(TAG, "setWhitelistedRestrictedPermissions, pkg: " + pkg + ", callingUid: "
+                    + callingUid + ", whitelistFlags: " + whitelistFlags);
+            /// @}
             PermissionManagerService.this.setWhitelistedRestrictedPermissions(
                     pkg, userIds, permissions, callingUid, whitelistFlags, callback);
         }
@@ -3053,12 +3232,20 @@ public class PermissionManagerService {
         @Override
         public void updatePermissions(String packageName, Package pkg, boolean replaceGrant,
                 Collection<PackageParser.Package> allPackages, PermissionCallback callback) {
+            /// M: CTA requirement - permission control @{
+            Slog.d(TAG, "updatePermissions, packageName: " + packageName + ", pkg: " + pkg
+                    + ", replaceGrant: " + replaceGrant);
+            /// @}
             PermissionManagerService.this.updatePermissions(
                     packageName, pkg, replaceGrant, allPackages, callback);
         }
         @Override
         public void updateAllPermissions(String volumeUuid, boolean sdkUpdated,
                 Collection<PackageParser.Package> allPackages, PermissionCallback callback) {
+            /// M: CTA requirement - permission control @{
+            Slog.d(TAG, "updateAllPermissions, volumeUuid: " + volumeUuid + ", sdkUpdated: "
+                    + sdkUpdated);
+            /// @}
             PermissionManagerService.this.updateAllPermissions(
                     volumeUuid, sdkUpdated, allPackages, callback);
         }

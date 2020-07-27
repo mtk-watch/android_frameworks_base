@@ -1108,6 +1108,16 @@ jstring AndroidRuntime::NewStringLatin1(JNIEnv* env, const char* bytes) {
     return env->NewString(buffer, length);
 }
 
+static void addBootEvent(const char *event)
+{
+    int bootprof = open("/proc/bootprof", O_WRONLY);
+    if (bootprof < 0) {
+        ALOGE("fail to open bootprof");
+        return;
+    }
+    write(bootprof, event, strlen(event));
+    close(bootprof);
+}
 
 /*
  * Start the Android runtime.  This involves starting the virtual machine
@@ -1133,6 +1143,7 @@ void AndroidRuntime::start(const char* className, const Vector<String8>& options
            /* track our progress through the boot sequence */
            const int LOG_BOOT_PROGRESS_START = 3000;
            LOG_EVENT_LONG(LOG_BOOT_PROGRESS_START,  ns2ms(systemTime(SYSTEM_TIME_MONOTONIC)));
+           addBootEvent("boot_progress_start");
         }
     }
 

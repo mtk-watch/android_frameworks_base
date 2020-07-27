@@ -28,6 +28,7 @@ import com.android.internal.policy.IKeyguardExitCallback;
 import com.android.internal.policy.IKeyguardService;
 import com.android.server.UiThread;
 import com.android.server.policy.WindowManagerPolicy.OnKeyguardExitResult;
+import com.mediatek.server.MtkSystemServer;
 
 import java.io.PrintWriter;
 
@@ -57,6 +58,9 @@ public class KeyguardServiceDelegate {
     private final KeyguardStateMonitor.StateCallback mCallback;
 
     private DrawnListener mDrawnListenerWhenConnect;
+
+    /// M: Add bootprof log for debug boot time.
+    private static MtkSystemServer sMtkSystemServer = MtkSystemServer.getInstance();
 
     private static final class KeyguardState {
         KeyguardState() {
@@ -104,6 +108,7 @@ public class KeyguardServiceDelegate {
 
         @Override
         public void onDrawn() throws RemoteException {
+            sMtkSystemServer.addBootEvent("Keyguard onDrawn");
             if (DEBUG) Log.v(TAG, "**** SHOWN CALLED ****");
             if (mDrawnListener != null) {
                 mDrawnListener.onDrawn();
@@ -143,6 +148,7 @@ public class KeyguardServiceDelegate {
         intent.addFlags(Intent.FLAG_DEBUG_TRIAGED_MISSING);
         intent.setComponent(keyguardComponent);
 
+        sMtkSystemServer.addBootEvent("Keyguard bindService");
         if (!context.bindServiceAsUser(intent, mKeyguardConnection,
                 Context.BIND_AUTO_CREATE, mHandler, UserHandle.SYSTEM)) {
             Log.v(TAG, "*** Keyguard: can't bind to " + keyguardComponent);
@@ -157,6 +163,7 @@ public class KeyguardServiceDelegate {
             }
         } else {
             if (DEBUG) Log.v(TAG, "*** Keyguard started");
+            sMtkSystemServer.addBootEvent("Keyguard started");
         }
     }
 
@@ -164,6 +171,7 @@ public class KeyguardServiceDelegate {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             if (DEBUG) Log.v(TAG, "*** Keyguard connected (yay!)");
+            sMtkSystemServer.addBootEvent("Keyguard connected");
             mKeyguardService = new KeyguardServiceWrapper(mContext,
                     IKeyguardService.Stub.asInterface(service), mCallback);
             if (mKeyguardState.systemIsReady) {

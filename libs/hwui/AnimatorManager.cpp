@@ -54,6 +54,7 @@ void AnimatorManager::addAnimator(const sp<BaseRenderNodeAnimator>& animator) {
 }
 
 void AnimatorManager::removeAnimator(const sp<BaseRenderNodeAnimator>& animator) {
+    ALOGI("removeAnimator");
     mNewAnimators.erase(std::remove(mNewAnimators.begin(), mNewAnimators.end(), animator),
                         mNewAnimators.end());
 }
@@ -76,7 +77,7 @@ void AnimatorManager::pushStaging() {
 
         // Only add new animators that are not already in the mAnimators list
         for (auto& anim : mNewAnimators) {
-            if (anim->target() != &mParent) {
+            if (anim != NULL && anim->target() != &mParent) {
                 mAnimators.push_back(std::move(anim));
             }
         }

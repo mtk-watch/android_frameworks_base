@@ -504,6 +504,9 @@ public final class PowerManagerService extends SystemService
     // Time when we last logged a warning about calling userActivity() without permission.
     private long mLastWarningAboutUserActivityPermission = Long.MIN_VALUE;
 
+    // shutdown screen off
+    private boolean mShutdownFlag = false;
+
     // True if the battery level is currently considered low.
     private boolean mBatteryLevelLow;
 
@@ -1496,6 +1499,14 @@ public final class PowerManagerService extends SystemService
             Slog.d(TAG, "goToSleepNoUpdateLocked: eventTime=" + eventTime
                     + ", reason=" + reason + ", flags=" + flags + ", uid=" + uid);
         }
+        //M add for support quick shutdown
+        if (reason == PowerManager.GO_TO_SLEEP_REASON_FORCE_SUSPEND) {
+            mDirty |= DIRTY_SETTINGS;
+            mShutdownFlag = true;
+            Slog.d(TAG, "go to sleep due to quick shutdown");
+            return true;
+        }
+        //M add end
 
         if (eventTime < mLastWakeTime
                 || mWakefulness == WAKEFULNESS_ASLEEP
@@ -2533,7 +2544,7 @@ public final class PowerManagerService extends SystemService
 
     @VisibleForTesting
     int getDesiredScreenPolicyLocked() {
-        if (mWakefulness == WAKEFULNESS_ASLEEP || sQuiescent) {
+        if (mWakefulness == WAKEFULNESS_ASLEEP || sQuiescent || mShutdownFlag) {
             return DisplayPowerRequest.POLICY_OFF;
         }
 

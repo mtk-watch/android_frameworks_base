@@ -269,6 +269,11 @@ public class TaskStack extends WindowContainer<Task> implements
     }
 
     private int setBounds(Rect existing, Rect bounds) {
+        /// M: Add debug info.
+        if (DEBUG_STACK) {
+            Slog.d(TAG_WM, "setBounds bound = " + bounds
+                    + ", stackId = " + mStackId, new Throwable("setBounds"));
+        }
         if (equivalentBounds(existing, bounds)) {
             return BOUNDS_CHANGE_NONE;
         }

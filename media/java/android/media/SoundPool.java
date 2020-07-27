@@ -35,6 +35,7 @@ import android.os.ParcelFileDescriptor;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.Build;
 import android.util.AndroidRuntimeException;
 import android.util.Log;
 
@@ -120,7 +121,8 @@ public class SoundPool extends PlayerBase {
     private static final int SAMPLE_LOADED = 1;
 
     private final static String TAG = "SoundPool";
-    private final static boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
+    private final static boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG)
+                                         || !"user".equals(Build.TYPE);
 
     private long mNativeContext; // accessed by native methods
 
@@ -174,7 +176,9 @@ public class SoundPool extends PlayerBase {
      */
     public final void release() {
         baseRelease();
+        Log.d(TAG, "native_release called");
         native_release();
+        Log.d(TAG, "native_release end");
     }
 
     private native final void native_release();

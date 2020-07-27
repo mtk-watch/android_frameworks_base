@@ -37,7 +37,7 @@ import com.android.internal.app.procstats.ProcessStats;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 
-final class ContentProviderRecord implements ComponentName.WithComponentName {
+public final class ContentProviderRecord implements ComponentName.WithComponentName {
     final ActivityManagerService service;
     public final ProviderInfo info;
     final int uid;

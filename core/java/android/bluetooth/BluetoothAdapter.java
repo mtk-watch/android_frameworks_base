@@ -1196,6 +1196,7 @@ public final class BluetoothAdapter {
         try {
             mServiceLock.readLock().lock();
             if (mService != null) {
+                disable();
                 return mService.factoryReset();
             }
             SystemProperties.set("persist.bluetooth.factoryreset", "true");

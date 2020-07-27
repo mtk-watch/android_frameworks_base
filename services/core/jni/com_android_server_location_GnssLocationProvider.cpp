@@ -222,6 +222,11 @@ sp<IGnssNavigationMessage> gnssNavigationMessageIface = nullptr;
 sp<IMeasurementCorrections> gnssCorrectionsIface = nullptr;
 sp<IGnssVisibilityControl> gnssVisibilityControlIface = nullptr;
 
+/// M: [Bug fix] Avoid AGPS callback occurs null pointer dereference exceptions
+sp<IGnssNiCallback> gnssNiCbIface = nullptr;
+sp<IAGnssRilCallback> aGnssRilCbIface = nullptr;
+/// M: mtk add end
+
 #define WAKE_LOCK_NAME  "GPS"
 
 namespace android {
@@ -718,6 +723,14 @@ Return<void> GnssCallback::gnssSvStatusCbImpl(const T& svStatus) {
     env->CallVoidMethod(mCallbacksObj, method_reportSvStatus,
             static_cast<jint>(listSize), svidWithFlagArray, cn0Array, elevArray, azimArray,
             carrierFreqArray);
+
+    /// M: [Bug fix] Fix memory leakage
+    env->DeleteLocalRef(svidWithFlagArray);
+    env->DeleteLocalRef(cn0Array);
+    env->DeleteLocalRef(elevArray);
+    env->DeleteLocalRef(azimArray);
+    env->DeleteLocalRef(carrierFreqArray);
+    /// M: mtk add end
 
     checkAndClearExceptionFromCallback(env, __FUNCTION__);
     return Void();
@@ -1958,7 +1971,14 @@ static jboolean android_location_GnssLocationProvider_init(JNIEnv* env, jobject 
     }
 
     // Set IGnssNi.hal callback.
-    sp<IGnssNiCallback> gnssNiCbIface = new GnssNiCallback();
+    /// M: [Bug fix] Fix null pointer dereference exceptions
+    if (gnssNiCbIface == nullptr) {
+        gnssNiCbIface = new GnssNiCallback();
+    } else {
+        ALOGD("Reuse existed gnssNiCbIface\n");
+    }
+    /// M: mtk add end
+
     if (gnssNiIface != nullptr) {
         auto status = gnssNiIface->setCallback(gnssNiCbIface);
         if (!status.isOk()) {
@@ -1969,7 +1989,14 @@ static jboolean android_location_GnssLocationProvider_init(JNIEnv* env, jobject 
     }
 
     // Set IAGnssRil.hal callback.
-    sp<IAGnssRilCallback> aGnssRilCbIface = new AGnssRilCallback();
+    /// M: [Bug fix] Fix null pointer dereference exceptions
+    if (aGnssRilCbIface == nullptr) {
+        aGnssRilCbIface = new AGnssRilCallback();
+    } else {
+        ALOGD("Reuse existed aGnssRilCbIface\n");
+    }
+    /// M: mtk add end
+
     if (agnssRilIface != nullptr) {
         auto status = agnssRilIface->setCallback(aGnssRilCbIface);
         if (!status.isOk()) {

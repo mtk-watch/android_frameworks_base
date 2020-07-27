@@ -528,11 +528,56 @@ static jobject android_drm_DrmManagerClient_acquireDrmInfo(
     while (env->CallBooleanMethod(keyIterator, Iterator_hasNext)) {
         ScopedLocalRef<jstring> key(env,
                 (jstring) env->CallObjectMethod(keyIterator, Iterator_next));
-        ScopedLocalRef<jstring> value(env,
-                (jstring) env->CallObjectMethod(drmInfoRequest, DrmInfoRequest_get, key.get()));
 
         String8 keyString = Utility::getStringValue(env, key.get());
-        String8 valueString = Utility::getStringValue(env, value.get());
+        String8 valueString("");
+
+        /// M: Add for OMA DRM v1.0 implementation, transfer fd and data from java to native. {@
+        String8 data_dm_fd("dmFd");
+        String8 data_dcf_fd("dcfFd");
+        String8 data_cta_clear_fd("CTA5clearFd");
+        String8 data_cta_cipher_fd("CTA5cipherFd");
+        String8 data_cta_fd("CTA5Fd");
+        String8 data_cta_key("CTA5key");
+        String8 data_cta_old_key("CTA5oldKey");
+        String8 data_cta_new_key("CTA5newKey");
+        if (keyString == data_dcf_fd || keyString == data_dm_fd) {
+            int fd = jniGetFDFromFileDescriptor(env,
+                    (jobject) env->CallObjectMethod(drmInfoRequest, DrmInfoRequest_get, key.get()));
+            char fd_str[32] = { 0 };
+            sprintf(fd_str, "%d", fd);
+            String8 fd_str8(fd_str);
+            valueString = fd_str8;
+        } else if (keyString == data_cta_clear_fd || keyString == data_cta_cipher_fd ||
+                keyString == data_cta_fd) {
+            int fd = jniGetFDFromFileDescriptor(env,
+                    (jobject) env->CallObjectMethod(drmInfoRequest, DrmInfoRequest_get, key.get()));
+            char fd_str[32] = { 0 };
+            sprintf(fd_str, "%d", fd);
+            String8 fd_str8(fd_str);
+            valueString = fd_str8;
+        } else if (keyString == data_cta_key || keyString == data_cta_old_key ||
+                keyString == data_cta_new_key) {
+            ScopedLocalRef<jbyteArray> value(env,
+                    (jbyteArray) env->CallObjectMethod(drmInfoRequest, DrmInfoRequest_get, key.get()));
+            int dataLength = 0;
+            char* data = Utility::getByteArrayValue(env, value.get(), &dataLength);
+            String8 data_str8(data, dataLength);
+            char *asciiData = (char *) malloc(dataLength + 1);
+            memset(asciiData, 0, dataLength + 1);
+            for (int i = 0; i < dataLength; ++i) {
+                asciiData[i] = data[i] - 1;//convert patter string from '0', not '1' to match L
+            }
+            //Convert 0-9 to ascii 0-9
+            valueString = String8::format("%s", asciiData);
+            free(asciiData);
+            asciiData = NULL;
+        } else {
+            ScopedLocalRef<jstring> value(env,
+                (jstring) env->CallObjectMethod(drmInfoRequest, DrmInfoRequest_get, key.get()));
+            valueString = Utility::getStringValue(env, value.get());
+        }
+        /// @}
         ALOGV("Key: %s | Value: %s", keyString.string(), valueString.string());
 
         drmInfoReq.put(keyString, valueString);

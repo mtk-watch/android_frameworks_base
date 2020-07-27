@@ -77,7 +77,9 @@ public class GsmSmsCbMessage {
 
     private static final char CARRIAGE_RETURN = 0x0d;
 
-    private static final int PDU_BODY_PAGE_LENGTH = 82;
+    // MTK-START
+    public static final int PDU_BODY_PAGE_LENGTH = 82;
+    // MTK-END
 
     /** Utility class with only static methods. */
     private GsmSmsCbMessage() { }
@@ -153,7 +155,9 @@ public class GsmSmsCbMessage {
      * @param pdu the PDU to decode
      * @return a Pair of Strings containing the language and body of the message
      */
-    private static Pair<String, String> parseBody(SmsCbHeader header, byte[] pdu) {
+    // MTK-START
+    public static Pair<String, String> parseBody(SmsCbHeader header, byte[] pdu) {
+    // MTK-END
         int encoding;
         String language = null;
         boolean hasLanguageIndicator = false;

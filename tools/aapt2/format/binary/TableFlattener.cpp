@@ -745,7 +745,9 @@ bool TableFlattener::Consume(IAaptContext* context, ResourceTable* table) {
     if (context->GetPackageType() == PackageType::kApp) {
       // Write a self mapping entry for this package if the ID is non-standard (0x7f).
       const uint8_t package_id = package->id.value();
-      if (package_id != kFrameworkPackageId && package_id != kAppPackageId) {
+      ///M: To support mediatek framework resources
+      if (package_id != kMtkFrameworkPackageId &&
+          package_id != kFrameworkPackageId && package_id != kAppPackageId) {
         auto result = table->included_packages_.insert({package_id, package->name});
         if (!result.second && result.first->second != package->name) {
           // A mapping for this package ID already exists, and is a different package. Error!

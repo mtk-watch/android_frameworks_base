@@ -60,6 +60,7 @@ public final class ZramWriteback extends JobService {
     private static final String MARK_IDLE_DELAY_PROP = "ro.zram.mark_idle_delay_mins";
     private static final String FIRST_WB_DELAY_PROP = "ro.zram.first_wb_delay_mins";
     private static final String PERIODIC_WB_DELAY_PROP = "ro.zram.periodic_wb_delay_hours";
+    private static final String SKIP_IDLE_ON_FIRST_WB_PROP = "ro.zram.skip_idle_on_first_wb";
 
     private void markPagesAsIdle() {
         String idlePath = String.format(IDLE_SYS, sZramDeviceId);
@@ -167,6 +168,7 @@ public final class ZramWriteback extends JobService {
     public static void scheduleZramWriteback(Context context) {
         int markIdleDelay = SystemProperties.getInt(MARK_IDLE_DELAY_PROP, 20);
         int firstWbDelay = SystemProperties.getInt(FIRST_WB_DELAY_PROP, 180);
+        boolean skipIdle = SystemProperties.getBoolean(SKIP_IDLE_ON_FIRST_WB_PROP, false);
 
         JobScheduler js = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
 
@@ -182,7 +184,7 @@ public final class ZramWriteback extends JobService {
         // by ro.zram.periodic_wb_delay_hours.
         js.schedule(new JobInfo.Builder(WRITEBACK_IDLE_JOB_ID, sZramWriteback)
                         .setMinimumLatency(TimeUnit.MINUTES.toMillis(firstWbDelay))
-                        .setRequiresDeviceIdle(true)
+                        .setRequiresDeviceIdle(!skipIdle)
                         .build());
     }
 }

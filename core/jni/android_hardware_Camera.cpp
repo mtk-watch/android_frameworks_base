@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
 **
 ** Copyright 2008, The Android Open Source Project
 **
@@ -33,6 +38,11 @@
 #include <gui/Surface.h>
 #include <camera/Camera.h>
 #include <binder/IMemory.h>
+
+//!++
+// Add MTK header
+#include <camera/mediatek/MtkCamera.h>
+//!--
 
 using namespace android;
 
@@ -89,6 +99,9 @@ public:
     void release();
 
 private:
+//!++
+protected: // MtkJNICameraContext need inheritance these info from JNICameraContext, so here need declare as protected member.
+//!--
     void copyAndPost(JNIEnv* env, const sp<IMemory>& dataPtr, int msgType);
     void clearCallbackBuffers_l(JNIEnv *env, Vector<jbyteArray> *buffers);
     void clearCallbackBuffers_l(JNIEnv *env);
@@ -125,6 +138,89 @@ private:
 bool JNICameraContext::isRawImageCallbackBufferAvailable() const
 {
     return !mRawImageCallbackBuffers.isEmpty();
+}
+
+//!++
+// MtkJNICameraContext is used for MTK camera feature.
+class MtkJNICameraContext : public JNICameraContext
+{
+public:
+                    ~MtkJNICameraContext();
+                    MtkJNICameraContext(JNIEnv* env, jobject weak_this, jclass clazz, const sp<Camera>& camera);
+    virtual void    postData(int32_t msgType, const sp<IMemory>& dataPtr, camera_frame_metadata_t *metadata);
+
+protected:
+    void            copyAndPostExtData(JNIEnv* env, const sp<IMemory>& dataPtr, int msgType);
+};
+
+MtkJNICameraContext::MtkJNICameraContext(JNIEnv* env, jobject weak_this, jclass clazz, const sp<Camera>& camera)
+    : JNICameraContext(env, weak_this, clazz, camera)
+{
+    ALOGD("(tid:%d)[MtkJNICameraContext] this:%p camera->getStrongCount(%d) \n", ::gettid(), this, camera->getStrongCount());
+}
+
+MtkJNICameraContext::~MtkJNICameraContext()
+{
+    ALOGD("(tid:%d)[~MtkJNICameraContext] this:%p \n", ::gettid(), this);
+}
+
+void MtkJNICameraContext::postData(int32_t msgType, const sp<IMemory>& dataPtr,
+                                camera_frame_metadata_t *metadata)
+{
+    int32_t dataMsgType = msgType & ~CAMERA_MSG_PREVIEW_METADATA;
+    if  ( (int32_t)MTK_CAMERA_MSG_EXT_DATA == dataMsgType ) {
+        // VM pointer will be NULL if object is released
+        Mutex::Autolock _l(mLock);
+        JNIEnv *env = AndroidRuntime::getJNIEnv();
+        if (mCameraJObjectWeak == NULL) {
+            ALOGW("callback on dead camera object");
+            return;
+        }
+        copyAndPostExtData(env, dataPtr, dataMsgType);
+        // post frame metadata to Java
+        if (metadata && (msgType & CAMERA_MSG_PREVIEW_METADATA)) {
+            postMetadata(env, CAMERA_MSG_PREVIEW_METADATA, metadata);
+        }
+    }
+    else {
+        JNICameraContext::postData(msgType, dataPtr, metadata);
+    }
+}
+
+
+void MtkJNICameraContext::copyAndPostExtData(JNIEnv* env, const sp<IMemory>& dataPtr, int msgType)
+{
+    jbyteArray obj = NULL;
+    uint32_t extMsgType = 0;
+
+    // allocate Java byte array and copy data
+    //
+    MtkCamMsgExtDataHelper MtkExtDataHelper;
+    if  ( MtkExtDataHelper.init(dataPtr) )
+    {
+        const jbyte* data = reinterpret_cast<const jbyte*>(MtkExtDataHelper.getExtParamBase());
+        const size_t size = MtkExtDataHelper.getExtParamSize();
+        const MtkCamMsgExtDataHelper::DataHeader extDataHeader = MtkExtDataHelper.getExtDataHeader();
+        extMsgType = extDataHeader.extMsgType;
+
+        ALOGV("[copyAndPostExtData] Allocating callback buffer");
+        obj = env->NewByteArray(size);
+        if (obj == NULL) {
+            ALOGE("[copyAndPostExtData] Couldn't allocate byte array");
+            env->ExceptionClear();
+        } else {
+            env->SetByteArrayRegion(obj, 0, size, data);
+        }
+
+        MtkExtDataHelper.uninit();
+    }
+
+    // post image data to Java
+    env->CallStaticVoidMethod(mCameraJClass, fields.post_event,
+            mCameraJObjectWeak, msgType, extMsgType, 0, obj);
+    if (obj) {
+        env->DeleteLocalRef(obj);
+    }
 }
 
 sp<Camera> get_native_camera(JNIEnv *env, jobject thiz, JNICameraContext** pContext)
@@ -597,7 +693,13 @@ static jint android_hardware_Camera_native_setup(JNIEnv *env, jobject thiz,
 
     // We use a weak reference so the Camera object can be garbage collected.
     // The reference is only used as a proxy for callbacks.
+//!++
+#if 0 // Use MTK JNI for MTK camera feature.
     sp<JNICameraContext> context = new JNICameraContext(env, weak_this, clazz, camera);
+#else
+    sp<JNICameraContext> context = new MtkJNICameraContext(env, weak_this, clazz, camera);
+#endif
+//!--
     context->incStrong((void*)android_hardware_Camera_native_setup);
     camera->setListener(context);
 
@@ -1023,6 +1125,111 @@ static void android_hardware_Camera_enableFocusMoveCallback(JNIEnv *env, jobject
     }
 }
 
+//!++
+static void android_hardware_Camera_setProperty(JNIEnv *env, jobject thiz, jstring keyJ, jstring valJ)
+{
+    ALOGV("MTK: setProperty");
+
+    String8 s8key;
+    String8 s8val;
+
+    if  (keyJ != NULL) {
+        const jchar* key = env->GetStringCritical(keyJ, 0);
+        s8key = String8(reinterpret_cast<const char16_t*>(key), env->GetStringLength(keyJ));
+        env->ReleaseStringCritical(keyJ, key);
+    }
+    else {
+        jniThrowNullPointerException(env, "key must not be null.");
+        return;
+    }
+
+    if (valJ != NULL) {
+        const jchar* val = env->GetStringCritical(valJ, 0);
+        s8val = String8(reinterpret_cast<const char16_t*>(val), env->GetStringLength(valJ));
+        env->ReleaseStringCritical(valJ, val);
+    }
+
+    status_t status = Camera::setProperty(s8key, s8val);
+    if  ( OK != status ) {
+        jniThrowException(env, "java/lang/RuntimeException",
+                          "failed to setProperty");
+    }
+}
+
+static jstring android_hardware_Camera_getProperty(JNIEnv *env, jobject thiz, jstring keyJ, jstring defJ)
+{
+    ALOGV("MTK: getProperty");
+
+    String8 s8key;
+    String8 s8val;
+    jstring rvJ = NULL;
+
+    if  (keyJ != NULL) {
+        const jchar* key = env->GetStringCritical(keyJ, 0);
+        s8key = String8(reinterpret_cast<const char16_t*>(key), env->GetStringLength(keyJ));
+        env->ReleaseStringCritical(keyJ, key);
+    }
+    else {
+        jniThrowNullPointerException(env, "key must not be null.");
+        return rvJ;
+    }
+
+    status_t status = Camera::getProperty(s8key, s8val);
+    if  ( OK == status && (s8val.length() > 0) ) {
+        rvJ = env->NewStringUTF(s8val.string());
+    } else if (defJ != NULL) {
+        rvJ = defJ;
+    } else {
+        rvJ = env->NewStringUTF("");
+    }
+
+    return rvJ;
+}
+
+static void android_hardware_Camera_stopAUTORAMA(JNIEnv *env, jobject thiz, jint value)
+{
+    ALOGV("stopAUTORAMA");
+    sp<Camera> camera = get_native_camera(env, thiz, NULL);
+    if (camera == 0) return;
+
+    if (camera->sendCommand(CAMERA_CMD_STOP_AUTORAMA, value, 0) != NO_ERROR) {
+        jniThrowException(env, "java/lang/RuntimeException", "stopAUTORAMA failed");
+    }
+}
+
+static void android_hardware_Camera_startAUTORAMA(JNIEnv *env, jobject thiz, jint value)
+{
+    ALOGV("startAUTORAMA");
+    sp<Camera> camera = get_native_camera(env, thiz, NULL);
+    if (camera == 0) return;
+
+    if (camera->sendCommand(CAMERA_CMD_START_AUTORAMA, value, 0) != NO_ERROR) {
+        jniThrowException(env, "java/lang/RuntimeException", "startAUTORAMA failed");
+    }
+}
+
+static void android_hardware_Camera_cancelContinuousShot(JNIEnv *env, jobject thiz)
+{
+    ALOGV("cancel ContinuousShot");
+    sp<Camera> camera = get_native_camera(env, thiz, NULL);
+    if (camera == 0) return;
+
+    if (camera->sendCommand(CAMERA_CMD_CANCEL_CSHOT, 0, 0) != NO_ERROR) {
+        jniThrowException(env, "java/lang/RuntimeException", "cancel ContinuousShot failed");
+    }
+}
+
+static void android_hardware_Camera_setContinuousShotSpeed(JNIEnv *env, jobject thiz, jint value)
+{
+    ALOGV("setContinuousShotSpeed");
+    sp<Camera> camera = get_native_camera(env, thiz, NULL);
+    if (camera == 0) return;
+
+    if (camera->sendCommand(CAMERA_CMD_SET_CSHOT_SPEED, value, 0) != NO_ERROR) {
+        jniThrowException(env, "java/lang/RuntimeException", "setContinuousShotSpeed failed");
+    }
+}
+//!--
 //-------------------------------------------------
 
 static const JNINativeMethod camMethods[] = {
@@ -1107,6 +1314,26 @@ static const JNINativeMethod camMethods[] = {
   { "enableFocusMoveCallback",
     "(I)V",
     (void *)android_hardware_Camera_enableFocusMoveCallback},
+//!++
+  { "native_setProperty",
+    "(Ljava/lang/String;Ljava/lang/String;)V",
+    (void*) android_hardware_Camera_setProperty },
+  { "native_getProperty",
+    "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+    (void*) android_hardware_Camera_getProperty },
+  { "stopAUTORAMA",
+    "(I)V",
+    (void *)android_hardware_Camera_stopAUTORAMA },
+  { "startAUTORAMA",
+    "(I)V",
+    (void *)android_hardware_Camera_startAUTORAMA },
+  { "cancelContinuousShot",
+    "()V",
+    (void *)android_hardware_Camera_cancelContinuousShot },
+  { "setContinuousShotSpeed",
+    "(I)V",
+    (void *)android_hardware_Camera_setContinuousShotSpeed },
+//!--
 };
 
 struct field {

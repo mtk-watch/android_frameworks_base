@@ -182,17 +182,22 @@ public class AudioService extends IAudioService.Stub
 
     private static final String TAG = "AS.AudioService";
 
+
+    /// M: Add for control debug log, only default enable it on eng/userdebug load.
+    protected static final boolean LOGD = "eng".equals(Build.TYPE)
+            || "userdebug".equals(Build.TYPE);
+
     /** Debug audio mode */
-    protected static final boolean DEBUG_MODE = false;
+    protected static final boolean DEBUG_MODE = false  || LOGD;
 
     /** Debug audio policy feature */
-    protected static final boolean DEBUG_AP = false;
+    protected static final boolean DEBUG_AP = false  || LOGD;
 
     /** Debug volumes */
-    protected static final boolean DEBUG_VOL = false;
+    protected static final boolean DEBUG_VOL = false  || LOGD;
 
     /** debug calls to devices APIs */
-    protected static final boolean DEBUG_DEVICES = false;
+    protected static final boolean DEBUG_DEVICES = false  || LOGD;
 
     /** How long to delay before persisting a change in volume/ringer mode. */
     private static final int PERSIST_DELAY = 500;
@@ -307,18 +312,19 @@ public class AudioService extends IAudioService.Stub
     private final int[][] SOUND_EFFECT_FILES_MAP = new int[AudioManager.NUM_SOUND_EFFECTS][2];
 
    /** Maximum volume index values for audio streams */
+    /// M: Modify the max stream volume @{
     protected static int[] MAX_STREAM_VOLUME = new int[] {
-        5,  // STREAM_VOICE_CALL
-        7,  // STREAM_SYSTEM
-        7,  // STREAM_RING
-        15, // STREAM_MUSIC
-        7,  // STREAM_ALARM
-        7,  // STREAM_NOTIFICATION
-        15, // STREAM_BLUETOOTH_SCO
-        7,  // STREAM_SYSTEM_ENFORCED
-        15, // STREAM_DTMF
-        15, // STREAM_TTS
-        15  // STREAM_ACCESSIBILITY
+        7,   // STREAM_VOICE_CALL
+        15,  // STREAM_SYSTEM
+        15,  // STREAM_RING
+        15,  // STREAM_MUSIC
+        15,  // STREAM_ALARM
+        15,  // STREAM_NOTIFICATION
+        15,  // STREAM_BLUETOOTH_SCO
+        15,  // STREAM_SYSTEM_ENFORCED
+        15,  // STREAM_DTMF
+        15,  // STREAM_TTS
+        15   // STREAM_ACCESSIBILITY
     };
 
     /** Minimum volume index values for audio streams */
@@ -983,6 +989,13 @@ public class AudioService extends IAudioService.Stub
                     AudioSystem.FORCE_SYSTEM_ENFORCED : AudioSystem.FORCE_NONE;
         }
 
+        if (LOGD) {
+            Log.i(TAG, new StringBuilder("setForceUse(")
+                .append(AudioSystem.forceUseUsageToString(AudioSystem.FOR_SYSTEM))
+                .append(", ").append(AudioSystem.forceUseConfigToString(forSys))
+                .append(") due to ").append("onAudioServerDied").toString());
+        }
+
         mDeviceBroker.setForceUse_Async(AudioSystem.FOR_SYSTEM, forSys, "onAudioServerDied");
 
         // Restore stream volumes
@@ -1012,6 +1025,13 @@ public class AudioService extends IAudioService.Stub
         synchronized (mSettingsLock) {
             final int forDock = mDockAudioMediaEnabled ?
                     AudioSystem.FORCE_ANALOG_DOCK : AudioSystem.FORCE_NONE;
+            if (LOGD) {
+                Log.i(TAG, new StringBuilder("setForceUse(")
+                    .append(AudioSystem.forceUseUsageToString(AudioSystem.FOR_DOCK))
+                    .append(", ").append(AudioSystem.forceUseConfigToString(forDock))
+                    .append(") due to ").append("onAudioServerDied").toString());
+            }
+
             mDeviceBroker.setForceUse_Async(AudioSystem.FOR_DOCK, forDock, "onAudioServerDied");
             sendEncodedSurroundMode(mContentResolver, "onAudioServerDied");
             sendEnabledSurroundFormats(mContentResolver, true);
@@ -1585,7 +1605,7 @@ public class AudioService extends IAudioService.Stub
     }
 
     private int rescaleIndex(int index, int srcStream, int dstStream) {
-        int srcRange =
+        /*int srcRange =
                 mStreamStates[srcStream].getMaxIndex() - mStreamStates[srcStream].getMinIndex();
         int dstRange =
                 mStreamStates[dstStream].getMaxIndex() - mStreamStates[dstStream].getMinIndex();
@@ -1597,7 +1617,17 @@ public class AudioService extends IAudioService.Stub
 
         return mStreamStates[dstStream].getMinIndex()
                 + ((index - mStreamStates[srcStream].getMinIndex()) * dstRange + srcRange / 2)
-                / srcRange;
+                / srcRange;*/
+       /* using Android P's rescale logic */
+        final int rescaled =
+                (index * mStreamStates[dstStream].getMaxIndex()
+                        + mStreamStates[srcStream].getMaxIndex() / 2)
+                / mStreamStates[srcStream].getMaxIndex();
+        if (rescaled < mStreamStates[dstStream].getMinIndex()) {
+            return mStreamStates[dstStream].getMinIndex();
+        } else {
+            return rescaled;
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -3224,7 +3254,12 @@ public class AudioService extends IAudioService.Stub
 
     /** @see AudioManager#setMode(int) */
     public void setMode(int mode, IBinder cb, String callingPackage) {
-        if (DEBUG_MODE) { Log.v(TAG, "setMode(mode=" + mode + ", callingPackage=" + callingPackage + ")"); }
+        if (DEBUG_MODE) {
+            Log.v(TAG, "setMode(mode=" + mode
+            + "[" + AudioSystem.modeToString(mode)
+            + "], callingPackage=" + callingPackage + ")");
+
+        }
         if (!checkAudioSettingsPermission("setMode()")) {
             return;
         }
@@ -3264,8 +3299,12 @@ public class AudioService extends IAudioService.Stub
     // any mode other than NORMAL.
     @GuardedBy("mDeviceBroker.mSetModeLock")
     private int setModeInt(int mode, IBinder cb, int pid, String caller) {
-        if (DEBUG_MODE) { Log.v(TAG, "setModeInt(mode=" + mode + ", pid=" + pid + ", caller="
-                + caller + ")"); }
+        if (DEBUG_MODE) {
+            Log.v(TAG, "setModeInt(mode=" + mode
+            + "[" + AudioSystem.modeToString(mode) + "]"
+            + ", pid=" + pid + ", caller="
+                + caller + ")");
+        }
         int newModeOwnerPid = 0;
         if (cb == null) {
             Log.e(TAG, "setModeInt() called with null binder");
@@ -3296,8 +3335,9 @@ public class AudioService extends IAudioService.Stub
                     cb = hdlr.getBinder();
                     actualMode = hdlr.getMode();
                     if (DEBUG_MODE) {
-                        Log.w(TAG, " using mode=" + mode + " instead due to death hdlr at pid="
-                                + hdlr.mPid);
+                        Log.w(TAG, " using actualmode=" + mode
+                           + " instead due to death hdlr at pid="
+                           + hdlr.mPid);
                     }
                 }
             } else {
@@ -3657,6 +3697,9 @@ public class AudioService extends IAudioService.Stub
         final String eventSource = new StringBuilder("setSpeakerphoneOn(").append(on)
                 .append(") from u/pid:").append(Binder.getCallingUid()).append("/")
                 .append(Binder.getCallingPid()).toString();
+        if (DEBUG_MODE) {
+                Log.d(TAG, eventSource);
+        }
         final boolean stateChanged = mDeviceBroker.setSpeakerphoneOn(on, eventSource);
         if (stateChanged) {
             final long ident = Binder.clearCallingIdentity();
@@ -3691,7 +3734,9 @@ public class AudioService extends IAudioService.Stub
         final String eventSource = new StringBuilder("setBluetoothScoOn(").append(on)
                 .append(") from u/pid:").append(Binder.getCallingUid()).append("/")
                 .append(Binder.getCallingPid()).toString();
-
+        if (DEBUG_MODE) {
+            Log.d(TAG, eventSource);
+        }
         mDeviceBroker.setBluetoothScoOn(on, eventSource);
     }
 
@@ -3709,6 +3754,9 @@ public class AudioService extends IAudioService.Stub
         final String eventSource = new StringBuilder("setBluetoothA2dpOn(").append(on)
                 .append(") from u/pid:").append(Binder.getCallingUid()).append("/")
                 .append(Binder.getCallingPid()).toString();
+        if (DEBUG_MODE) {
+            Log.d(TAG, eventSource);
+        }
         mDeviceBroker.setBluetoothA2dpOn_Async(on, eventSource);
     }
 
@@ -3725,6 +3773,9 @@ public class AudioService extends IAudioService.Stub
         final String eventSource = new StringBuilder("startBluetoothSco()")
                 .append(") from u/pid:").append(Binder.getCallingUid()).append("/")
                 .append(Binder.getCallingPid()).toString();
+        if (DEBUG_MODE) {
+            Log.d(TAG, eventSource);
+        }
         startBluetoothScoInt(cb, scoAudioMode, eventSource);
     }
 
@@ -3733,6 +3784,9 @@ public class AudioService extends IAudioService.Stub
         final String eventSource = new StringBuilder("startBluetoothScoVirtualCall()")
                 .append(") from u/pid:").append(Binder.getCallingUid()).append("/")
                 .append(Binder.getCallingPid()).toString();
+        if (DEBUG_MODE) {
+            Log.d(TAG, eventSource);
+        }
         startBluetoothScoInt(cb, BtHelper.SCO_MODE_VIRTUAL_CALL, eventSource);
     }
 
@@ -3755,6 +3809,9 @@ public class AudioService extends IAudioService.Stub
         final String eventSource =  new StringBuilder("stopBluetoothSco()")
                 .append(") from u/pid:").append(Binder.getCallingUid()).append("/")
                 .append(Binder.getCallingPid()).toString();
+        if (DEBUG_MODE) {
+            Log.d(TAG, eventSource);
+        }
         synchronized (mDeviceBroker.mSetModeLock) {
             mDeviceBroker.stopBluetoothScoForClient_Sync(cb, eventSource);
         }
@@ -4372,6 +4429,17 @@ public class AudioService extends IAudioService.Stub
                 && state != CONNECTION_STATE_DISCONNECTED) {
             throw new IllegalArgumentException("Invalid state " + state);
         }
+        if (DEBUG_DEVICES) {
+            final String eventSource = new StringBuilder("setWiredDeviceConnectionState()")
+            .append(") from u/pid:").append(Binder.getCallingUid()).append("/")
+            .append(Binder.getCallingPid())
+            .append(", type=").append(type)
+            .append(", state=").append(state)
+            .append(", address=").append(address)
+            .append(", name=").append(name)
+            .append(", caller=").append(caller).toString();
+            Log.d(TAG, eventSource);
+        }
         mDeviceBroker.setWiredDeviceConnectionState(type, state, address, name, caller);
     }
 
@@ -4402,10 +4470,16 @@ public class AudioService extends IAudioService.Stub
             throw new IllegalArgumentException("Illegal BluetoothProfile state for device "
                     + " (dis)connection, got " + state);
         }
-        if (state == BluetoothProfile.STATE_CONNECTED) {
-            mPlaybackMonitor.registerPlaybackCallback(mVoiceActivityMonitor, true);
-        } else {
-            mPlaybackMonitor.unregisterPlaybackCallback(mVoiceActivityMonitor);
+        if (DEBUG_DEVICES) {
+            final String eventSource = new StringBuilder(
+             "setBluetoothHearingAidDeviceConnectionState()")
+            .append(") from u/pid:").append(Binder.getCallingUid()).append("/")
+            .append(Binder.getCallingPid())
+            .append(", device=").append(device)
+            .append(", state=").append(state)
+            .append(", suppressNoisyIntent=").append(suppressNoisyIntent)
+            .append(", musicDevice=").append(musicDevice).toString();
+            Log.d(TAG, eventSource);
         }
         mDeviceBroker.postBluetoothHearingAidDeviceConnectionState(
                 device, state, suppressNoisyIntent, musicDevice, "AudioService");
@@ -4425,6 +4499,17 @@ public class AudioService extends IAudioService.Stub
             throw new IllegalArgumentException("Illegal BluetoothProfile state for device "
                     + " (dis)connection, got " + state);
         }
+        if (DEBUG_DEVICES) {
+            final String eventSource = new StringBuilder(
+                "setBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent()")
+            .append(") from u/pid:").append(Binder.getCallingUid()).append("/")
+            .append(Binder.getCallingPid())
+            .append(", device=").append(device)
+            .append(", state=").append(state)
+            .append(", suppressNoisyIntent=").append(suppressNoisyIntent)
+            .append(", a2dpVolume=").append(a2dpVolume).toString();
+            Log.d(TAG, eventSource);
+        }
         mDeviceBroker.postBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent(device, state,
                 profile, suppressNoisyIntent, a2dpVolume);
     }
@@ -4437,6 +4522,14 @@ public class AudioService extends IAudioService.Stub
     {
         if (device == null) {
             throw new IllegalArgumentException("Illegal null device");
+        }
+        if (DEBUG_DEVICES) {
+            final String eventSource = new StringBuilder(
+            "handleBluetoothA2dpDeviceConfigChange()")
+            .append(") from u/pid:").append(Binder.getCallingUid()).append("/")
+            .append(Binder.getCallingPid())
+            .append(", device=").append(device).toString();
+            Log.d(TAG, eventSource);
         }
         mDeviceBroker.postBluetoothA2dpDeviceConfigChange(device);
     }

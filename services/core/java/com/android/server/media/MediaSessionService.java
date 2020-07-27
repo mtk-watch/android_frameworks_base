@@ -59,6 +59,7 @@ import android.media.session.MediaSession;
 import android.media.session.MediaSessionManager;
 import android.net.Uri;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerExecutor;
@@ -99,7 +100,9 @@ import java.util.List;
  */
 public class MediaSessionService extends SystemService implements Monitor {
     private static final String TAG = "MediaSessionService";
-    static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
+    static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG)
+            || "eng".equals(Build.TYPE)
+            || "userdebug".equals(Build.TYPE);
     // Leave log for key event always.
     private static final boolean DEBUG_KEY_EVENT = true;
 

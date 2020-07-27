@@ -643,6 +643,7 @@ java_defaults {
         "wifi/java/android/net/wifi/INetworkRequestMatchCallback.aidl",
         "wifi/java/android/net/wifi/INetworkRequestUserSelectionCallback.aidl",
         "wifi/java/android/net/wifi/ISoftApCallback.aidl",
+        "wifi/java/android/net/wifi/IStaStateCallback.aidl",
         "wifi/java/android/net/wifi/ITrafficStateCallback.aidl",
         "wifi/java/android/net/wifi/IWifiManager.aidl",
         "wifi/java/android/net/wifi/IOnWifiUsabilityStatsListener.aidl",
@@ -1837,4 +1838,54 @@ aidl_mapping {
     name: "framework-aidl-mappings",
     srcs: [":framework-defaults"],
     output: "framework-aidl-mappings.txt"
+}
+
+// MTK ProductApi
+mtk_productapi_check_defaults {
+    name: "mtk_productapi_check_defaults",
+}
+
+bootstrap_go_package  {
+    name:"soong-mtk_productapi_check_defaults-mediatek",
+    pkgPath:"android/soong/productapi/mediatek",
+    deps:[
+        "soong-android",
+        "soong-java",
+     ],
+    srcs:[
+        "../../vendor/mediatek/proprietary/frameworks/base/productapi_check.go",
+      ],
+    pluginFor:["soong_build"],
+}
+
+filegroup {
+    name: "mtk-product-api-define",
+    srcs: [
+        "core/java/android/annotation/ProductApi.java",
+    ],
+}
+
+mtk_aosp_metalava_framework_docs_args = "--manifest $(location core/res/AndroidManifest.xml) " +
+    "--hide-package com.android.okhttp " +
+    "--hide-package com.android.org.conscrypt --hide-package com.android.server " +
+    "--hide RequiresPermission " +
+    "--hide MissingPermission --hide BroadcastBehavior " +
+    "--hide HiddenSuperclass --hide DeprecationMismatch --hide UnavailableSymbol " +
+    "--hide SdkConstant --hide HiddenTypeParameter --hide Todo --hide Typo " +
+    "--hide ReferencesHidden --hide ReferencesHidden --hide UnhiddenSystemApi"
+
+droidstubs {
+    name: "mtk-aosp-product-api-stubs-docs",
+    defaults: ["metalava-api-stubs-default", "mtk_productapi_check_defaults"],
+    srcs_lib_whitelist_pkgs: ["com.mediatek.cta"],
+    api_tag_name: "PRODUCT",
+    api_filename: "product-api.txt",
+    private_api_filename: "product-private.txt",
+    private_dex_api_filename: "product-private-dex.txt",
+    removed_api_filename: "product-removed.txt",
+    arg_files: [
+        "core/res/AndroidManifest.xml",
+    ],
+    args: mtk_aosp_metalava_framework_docs_args + " --show-annotation android.annotation.ProductApi",
+    jdiff_enabled: false,
 }

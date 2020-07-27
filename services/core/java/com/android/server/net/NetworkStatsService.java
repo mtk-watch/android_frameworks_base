@@ -111,6 +111,8 @@ import android.os.Messenger;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.SystemClock;
+// M: modify for customiztion of MtkNetworkStatsService.java
+import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.provider.Settings;
@@ -140,10 +142,15 @@ import com.android.server.EventLogTags;
 import com.android.server.LocalServices;
 import com.android.server.connectivity.Tethering;
 
+// M: modify for customiztion of MtkNetworkStatsService.java
+import dalvik.system.PathClassLoader;
+
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.PrintWriter;;
+// M: modify for customiztion of MtkNetworkStatsService.java
+import java.lang.reflect.Constructor;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -181,7 +188,8 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     private static final String TAG_NETSTATS_ERROR = "netstats_error";
 
     private final Context mContext;
-    private final INetworkManagementService mNetworkManager;
+    // M: ALPS04920045 modify for customiztion of MtkNetworkStatsService.java, make it protected
+    protected final INetworkManagementService mNetworkManager;
     private final AlarmManager mAlarmManager;
     private final Clock mClock;
     private final TelephonyManager mTeleManager;
@@ -193,7 +201,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
 
     private final PowerManager.WakeLock mWakeLock;
 
-    private final boolean mUseBpfTrafficStats;
+    protected final boolean mUseBpfTrafficStats;
 
     @VisibleForTesting
     public static final String ACTION_NETWORK_STATS_POLL =
@@ -249,11 +257,13 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
 
     /** Set of currently active ifaces. */
     @GuardedBy("mStatsLock")
-    private final ArrayMap<String, NetworkIdentitySet> mActiveIfaces = new ArrayMap<>();
+    // M: modify for customiztion of MtkNetworkStatsService.java, make it protected
+    protected final ArrayMap<String, NetworkIdentitySet> mActiveIfaces = new ArrayMap<>();
 
     /** Set of currently active ifaces for UID stats. */
     @GuardedBy("mStatsLock")
-    private final ArrayMap<String, NetworkIdentitySet> mActiveUidIfaces = new ArrayMap<>();
+    // M: modify for customiztion of MtkNetworkStatsService.java, make it protected
+    protected final ArrayMap<String, NetworkIdentitySet> mActiveUidIfaces = new ArrayMap<>();
 
     /** Current default active iface. */
     @GuardedBy("mStatsLock")
@@ -291,7 +301,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     private SparseIntArray mActiveUidCounterSet = new SparseIntArray();
 
     /** Data layer operation counters for splicing into other structures. */
-    private NetworkStats mUidOperations = new NetworkStats(0L, 10);
+    protected NetworkStats mUidOperations = new NetworkStats(0L, 10);
 
     /** Must be set in factory by calling #setHandler. */
     private Handler mHandler;
@@ -339,10 +349,45 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         PowerManager.WakeLock wakeLock =
                 powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
 
-        NetworkStatsService service = new NetworkStatsService(context, networkManager, alarmManager,
+        /// M: Mediatek add on for glue layer.
+        // M: modify for customiztion of MtkNetworkStatsService.java
+        /** M:
+         * Try to load MtkNetworkStatsService, if it is not
+         * existed, use AOSP NetworkStatsService @{
+         */
+        NetworkStatsService service = null;
+        try {
+            PathClassLoader pcLoader = new PathClassLoader(
+                    "/system/framework/mediatek-framework-net.jar",
+                    context.getClassLoader());
+            Class mtkNetworkStatsService = pcLoader.loadClass(
+                    "com.mediatek.server.MtkNetworkStatsService");
+            Constructor clazzConstructfunc = mtkNetworkStatsService.getConstructor(
+                    new Class[] {Context.class,
+                    android.os.INetworkManagementService.class,
+                    android.app.AlarmManager.class,
+                    android.os.PowerManager.WakeLock.class,
+                    java.time.Clock.class,
+                    android.telephony.TelephonyManager.class,
+                    com.android.server.net.NetworkStatsService.NetworkStatsSettings.class,
+                    com.android.server.net.NetworkStatsObservers.class,
+                    java.io.File.class,
+                    java.io.File.class});
+            clazzConstructfunc.setAccessible(true);
+            Object mtkNetworkStats = (Object) clazzConstructfunc.newInstance(context,
+                    networkManager, alarmManager, wakeLock, getDefaultClock(),
+                    TelephonyManager.getDefault(), new DefaultNetworkStatsSettings(context),
+                    new NetworkStatsObservers(), getDefaultSystemDir(), getDefaultBaseDir());
+            service = (NetworkStatsService)mtkNetworkStats;
+        }  catch (Exception e) {
+            Slog.e(TAG, "No MtkNetworkStatsService! Used AOSP for instead!", e);
+        }
+        if (service == null) {
+                service = new NetworkStatsService(context, networkManager, alarmManager,
                 wakeLock, getDefaultClock(), TelephonyManager.getDefault(),
                 new DefaultNetworkStatsSettings(context), new NetworkStatsObservers(),
                 getDefaultSystemDir(), getDefaultBaseDir());
+        }
         service.registerLocalService();
 
         HandlerThread handlerThread = new HandlerThread(TAG);
@@ -356,7 +401,8 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     // This must not be called outside of tests, even within the same package, as this constructor
     // does not register the local service. Use the create() helper above.
     @VisibleForTesting
-    NetworkStatsService(Context context, INetworkManagementService networkManager,
+    // M: modify for customiztion of MtkNetworkStatsService.java, make it protected
+    protected NetworkStatsService(Context context, INetworkManagementService networkManager,
             AlarmManager alarmManager, PowerManager.WakeLock wakeLock, Clock clock,
             TelephonyManager teleManager, NetworkStatsSettings settings,
             NetworkStatsObservers statsObservers, File systemDir, File baseDir) {
@@ -452,7 +498,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     }
 
     @GuardedBy("mStatsLock")
-    private void shutdownLocked() {
+    protected void shutdownLocked() {
         mContext.unregisterReceiver(mTetherReceiver);
         mContext.unregisterReceiver(mPollReceiver);
         mContext.unregisterReceiver(mRemovedReceiver);
@@ -891,7 +937,8 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         }
     }
 
-    private void advisePersistThreshold(long thresholdBytes) {
+    // M: modify for customiztion of MtkNetworkStatsService.java, make it protected
+    protected void advisePersistThreshold(long thresholdBytes) {
         assertBandwidthControlEnabled();
 
         // clamp threshold into safe range
@@ -1180,6 +1227,9 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
             mDefaultNetworks = defaultNetworks;
         }
 
+        // M: Add support for Multiple ViLTE
+        rebuildActiveVilteIfaceMap();
+
         final ArraySet<String> mobileIfaces = new ArraySet<>();
         for (NetworkState state : states) {
             if (state.networkInfo.isConnected()) {
@@ -1208,8 +1258,13 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
                                 ident.getSubType(), ident.getSubscriberId(), ident.getNetworkId(),
                                 ident.getRoaming(), true /* metered */,
                                 true /* onDefaultNetwork */);
-                        findOrCreateNetworkIdentitySet(mActiveIfaces, VT_INTERFACE).add(vtIdent);
-                        findOrCreateNetworkIdentitySet(mActiveUidIfaces, VT_INTERFACE).add(vtIdent);
+                        // M: For Multiple ViLTE, Separate VT_INTERFACE according to subId
+                        if (!findOrCreateMultipleVilteNetworkIdentitySets(vtIdent)) {
+                            findOrCreateNetworkIdentitySet(mActiveIfaces,
+                                                           VT_INTERFACE).add(vtIdent);
+                            findOrCreateNetworkIdentitySet(mActiveUidIfaces,
+                                                           VT_INTERFACE).add(vtIdent);
+                        }
                     }
 
                     if (isMobile) {
@@ -1247,7 +1302,17 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
         mMobileIfaces = mobileIfaces.toArray(new String[mobileIfaces.size()]);
     }
 
-    private static <K> NetworkIdentitySet findOrCreateNetworkIdentitySet(
+    // M: Add support for Multiple ViLTE
+    protected void rebuildActiveVilteIfaceMap() {
+    }
+
+    // M: Add support for Multiple ViLTE
+    protected boolean findOrCreateMultipleVilteNetworkIdentitySets(NetworkIdentity vtident) {
+        return false;
+    }
+
+    // M: modify for customiztion of MtkNetworkStatsService.java, make it protected
+    protected static <K> NetworkIdentitySet findOrCreateNetworkIdentitySet(
             ArrayMap<K, NetworkIdentitySet> map, K key) {
         NetworkIdentitySet ident = map.get(key);
         if (ident == null) {
@@ -1673,7 +1738,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
      * @param ifaces A list of interfaces the stats should be restricted to, or
      *               {@link NetworkStats#INTERFACES_ALL}.
      */
-    private NetworkStats getNetworkStatsUidDetail(String[] ifaces)
+    protected NetworkStats getNetworkStatsUidDetail(String[] ifaces)
             throws RemoteException {
 
         // TODO: remove 464xlat adjustments from NetworkStatsFactory and apply all at once here.
@@ -1707,7 +1772,7 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
     /**
      * Return snapshot of current XT statistics with video calling data usage statistics.
      */
-    private NetworkStats getNetworkStatsXt() throws RemoteException {
+    protected NetworkStats getNetworkStatsXt() throws RemoteException {
         final NetworkStats xtSnapshot = mNetworkManager.getNetworkStatsSummaryXt();
 
         final TelephonyManager telephonyManager = (TelephonyManager) mContext.getSystemService(
@@ -1726,7 +1791,8 @@ public class NetworkStatsService extends INetworkStatsService.Stub {
      * Return snapshot of current tethering statistics. Will return empty
      * {@link NetworkStats} if any problems are encountered.
      */
-    private NetworkStats getNetworkStatsTethering(int how) throws RemoteException {
+    // M: ALPS04920045 modify for customiztion of MtkNetworkStatsService.java, make it protected
+    protected NetworkStats getNetworkStatsTethering(int how) throws RemoteException {
         try {
             return mNetworkManager.getNetworkStatsTethering(how);
         } catch (IllegalStateException e) {

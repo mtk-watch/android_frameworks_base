@@ -1020,6 +1020,12 @@ public final class BluetoothDevice implements Parcelable {
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
         }
+        catch (NullPointerException npe) {
+            // Handle case where bluetooth service proxy
+            // is already null.
+            Log.e(TAG, "NullPointerException for getName() of device (" +
+                getAddress() + ")", npe);
+        }
         return null;
     }
 
@@ -1040,6 +1046,12 @@ public final class BluetoothDevice implements Parcelable {
             return service.getRemoteType(this);
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
+        }
+        catch (NullPointerException npe) {
+            // Handle case where bluetooth service proxy
+            // is already null.
+            Log.e(TAG, "NullPointerException for getType() of device (" +
+                getAddress() + ")", npe);
         }
         return DEVICE_TYPE_UNKNOWN;
     }
@@ -1062,6 +1074,12 @@ public final class BluetoothDevice implements Parcelable {
             return service.getRemoteAlias(this);
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
+        }
+        catch (NullPointerException npe) {
+            // Handle case where bluetooth service proxy
+            // is already null.
+            Log.e(TAG, "NullPointerException for getAlias() of device (" +
+                getAddress() + ")", npe);
         }
         return null;
     }
@@ -1130,6 +1148,12 @@ public final class BluetoothDevice implements Parcelable {
             return service.getBatteryLevel(this);
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
+        }
+        catch (NullPointerException npe) {
+            // Handle case where bluetooth service proxy
+            // is already null.
+            Log.e(TAG, "NullPointerException for getBatteryLevel() of device (" +
+                getAddress() + ")", npe);
         }
         return BATTERY_LEVEL_UNKNOWN;
     }
@@ -1344,6 +1368,12 @@ public final class BluetoothDevice implements Parcelable {
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
         }
+        catch (NullPointerException npe) {
+            // Handle case where bluetooth service proxy
+            // is already null.
+            Log.e(TAG, "NullPointerException for getBondState() of device (" +
+                getAddress() + ")", npe);
+        }
         return BOND_NONE;
     }
 
@@ -1413,6 +1443,12 @@ public final class BluetoothDevice implements Parcelable {
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
         }
+        catch (NullPointerException npe) {
+            // Handle case where bluetooth service proxy
+            // is already null.
+            Log.e(TAG, "NullPointerException for getBluetoothClass() of device (" +
+                getAddress() + ")", npe);
+        }
         return null;
     }
 
@@ -1438,6 +1474,12 @@ public final class BluetoothDevice implements Parcelable {
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
         }
+        catch (NullPointerException npe) {
+            // Handle case where bluetooth service proxy
+            // is already null.
+            Log.e(TAG, "NullPointerException for getUuids() of device (" +
+                getAddress() + ")", npe);
+        }
         return null;
     }
 
@@ -1462,6 +1504,9 @@ public final class BluetoothDevice implements Parcelable {
             return false;
         }
         try {
+            if (getBondState() == BOND_BONDING){
+                return false;
+            }
             return service.fetchRemoteUuids(this);
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
@@ -1619,6 +1664,12 @@ public final class BluetoothDevice implements Parcelable {
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
         }
+        catch (NullPointerException npe) {
+            // Handle case where bluetooth service proxy
+            // is already null.
+            Log.e(TAG, "NullPointerException for getPhonebookAccessPermission() of device (" +
+                getAddress() + ")", npe);
+        }
         return ACCESS_UNKNOWN;
     }
 
@@ -1728,6 +1779,12 @@ public final class BluetoothDevice implements Parcelable {
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
         }
+        catch (NullPointerException npe) {
+            // Handle case where bluetooth service proxy
+            // is already null.
+            Log.e(TAG, "NullPointerException for getMessageAccessPermission() of device (" +
+                getAddress() + ")", npe);
+        }
         return ACCESS_UNKNOWN;
     }
 
@@ -1770,6 +1827,12 @@ public final class BluetoothDevice implements Parcelable {
             return service.getSimAccessPermission(this);
         } catch (RemoteException e) {
             Log.e(TAG, "", e);
+        }
+        catch (NullPointerException npe) {
+            // Handle case where bluetooth service proxy
+            // is already null.
+            Log.e(TAG, "NullPointerException for getSimAccessPermission() of device (" +
+                getAddress() + ")", npe);
         }
         return ACCESS_UNKNOWN;
     }

@@ -288,7 +288,7 @@ public abstract class PackageSettingBase extends SettingBase {
         return state;
     }
 
-    void setEnabled(int state, int userId, String callingPackage) {
+    public void setEnabled(int state, int userId, String callingPackage) {
         PackageUserState st = modifyUserState(userId);
         st.enabled = state;
         st.lastDisableAppCaller = callingPackage;
@@ -302,7 +302,7 @@ public abstract class PackageSettingBase extends SettingBase {
         return readUserState(userId).lastDisableAppCaller;
     }
 
-    void setInstalled(boolean inst, int userId) {
+    public void setInstalled(boolean inst, int userId) {
         modifyUserState(userId).installed = inst;
     }
 
@@ -342,7 +342,7 @@ public abstract class PackageSettingBase extends SettingBase {
         return false;
     }
 
-    int[] queryInstalledUsers(int[] users, boolean installed) {
+    public int[] queryInstalledUsers(int[] users, boolean installed) {
         int num = 0;
         for (int user : users) {
             if (getInstalled(user) == installed) {

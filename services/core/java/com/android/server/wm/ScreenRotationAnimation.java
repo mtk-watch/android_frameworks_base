@@ -257,6 +257,9 @@ class ScreenRotationAnimation {
         mOriginalWidth = originalWidth;
         mOriginalHeight = originalHeight;
 
+        /// M: MTK Power: Enable rotation boost
+        mService.mPowerHalManager.setRotationBoost(true);
+
         final SurfaceControl.Transaction t = mService.mTransactionFactory.make();
         try {
             mSurfaceControl = displayContent.makeOverlay()
@@ -694,6 +697,8 @@ class ScreenRotationAnimation {
             mRotateEnterAnimation.cancel();
             mRotateEnterAnimation = null;
         }
+        /// M: MTK Power: Disable rotation boost
+        mService.mPowerHalManager.setRotationBoost(false);
     }
 
     public boolean isAnimating() {

@@ -33,6 +33,7 @@ import android.os.Trace;
 import android.util.Log;
 import android.util.TimeUtils;
 import android.view.animation.AnimationUtils;
+import com.mediatek.view.ViewDebugManager;
 
 import java.io.PrintWriter;
 
@@ -82,10 +83,10 @@ public final class Choreographer {
     private static final String TAG = "Choreographer";
 
     // Prints debug messages about jank which was detected (low volume).
-    private static final boolean DEBUG_JANK = false;
+    private static final boolean DEBUG_JANK = ViewDebugManager.DEBUG_CHOREOGRAPHER_JANK;
 
     // Prints debug messages about every frame and callback registered (high volume).
-    private static final boolean DEBUG_FRAMES = false;
+    private static final boolean DEBUG_FRAMES = ViewDebugManager.DEBUG_CHOREOGRAPHER_FRAMES;
 
     // The default amount of time in ms between animation frames.
     // When vsync is not enabled, we want to have some idea of how long we should
@@ -449,7 +450,7 @@ public final class Choreographer {
         if (DEBUG_FRAMES) {
             Log.d(TAG, "PostCallback: type=" + callbackType
                     + ", action=" + action + ", token=" + token
-                    + ", delayMillis=" + delayMillis);
+                    + ", delayMillis=" + delayMillis, new Throwable());
         }
 
         synchronized (mLock) {

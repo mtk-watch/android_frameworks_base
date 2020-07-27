@@ -3553,6 +3553,24 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         }
     }
 
+    /// M: Add for DuraSpeed, get all appwidget component name @{
+    @Override
+    public List<ComponentName> getAppWidgetOfHost(String pkg, int uid) {
+        final List<ComponentName> hostProviders = new ArrayList<>();
+        for (int i = 0; i < mHosts.size(); i++) {
+            Host host = mHosts.get(i);
+            if (UserHandle.getUserId(host.id.uid) == uid && pkg.equals(host.id.packageName)) {
+                for (int j = 0; j < host.widgets.size(); j++) {
+                    if (host.widgets.get(j).provider != null) {
+                        hostProviders.add(host.widgets.get(j).provider.id.componentName);
+                    }
+                }
+            }
+        }
+        return hostProviders;
+    }
+    /// @}
+
     private boolean isProfileWithLockedParent(int userId) {
         long token = Binder.clearCallingIdentity();
         try {

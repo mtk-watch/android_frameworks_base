@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <assert.h>
+#include <cutils/properties.h>
 #include <utils/Log.h>
 #include <utils/threads.h>
 #include <SkBitmap.h>
@@ -28,7 +29,6 @@
 #include <media/mediascanner.h>
 #include <nativehelper/ScopedLocalRef.h>
 #include <private/media/VideoFrame.h>
-
 #include "jni.h"
 #include <nativehelper/JNIHelp.h>
 #include "android_runtime/AndroidRuntime.h"
@@ -58,6 +58,7 @@ struct fields_t {
 static fields_t fields;
 static Mutex sLock;
 static const char* const kClassPathName = "android/media/MediaMetadataRetriever";
+static int  isRamOptimized = 0;
 
 static void process_media_retriever_call(JNIEnv *env, status_t opStatus, const char* exception, const char *message)
 {
@@ -395,7 +396,17 @@ static jobject android_media_MediaMetadataRetriever_getFrameAtTime(
 
     // Call native method to retrieve a video frame
     VideoFrame *videoFrame = NULL;
-    sp<IMemory> frameMemory = retriever->getFrameAtTime(timeUs, option);
+    sp<IMemory> frameMemory = NULL;
+
+    if (!isRamOptimized){
+        ALOGV("High quality thumbnail enable");
+        frameMemory = retriever->getFrameAtTime(timeUs, option,
+                                                            HAL_PIXEL_FORMAT_RGBA_8888);
+    }
+    else{
+        ALOGV("High quality thumbnail disable");
+        frameMemory = retriever->getFrameAtTime(timeUs, option);
+    }
     if (frameMemory != 0) {  // cast the shared structure to a VideoFrame object
         videoFrame = static_cast<VideoFrame *>(frameMemory->pointer());
     }
@@ -404,7 +415,15 @@ static jobject android_media_MediaMetadataRetriever_getFrameAtTime(
         return NULL;
     }
 
-    return getBitmapFromVideoFrame(env, videoFrame, dst_width, dst_height, kRGB_565_SkColorType);
+    if (!isRamOptimized){
+        return getBitmapFromVideoFrame(env, videoFrame, dst_width, dst_height,
+                                       kRGBA_8888_SkColorType);
+    }
+    else{
+        return getBitmapFromVideoFrame(env, videoFrame, dst_width, dst_height,
+                                       kRGB_565_SkColorType);
+    }
+
 }
 
 static jobject android_media_MediaMetadataRetriever_getImageAtIndex(
@@ -604,6 +623,7 @@ static void android_media_MediaMetadataRetriever_native_finalize(JNIEnv *env, jo
 // first time an instance of this class is used.
 static void android_media_MediaMetadataRetriever_native_init(JNIEnv *env)
 {
+    char tempPropVal[128];
     ScopedLocalRef<jclass> clazz(env, env->FindClass(kClassPathName));
     if (clazz.get() == NULL) {
         return;
@@ -687,6 +707,8 @@ static void android_media_MediaMetadataRetriever_native_init(JNIEnv *env)
     if (fields.arrayListAdd == NULL) {
         return;
     }
+    property_get("ro.vendor.gmo.ram_optimize", tempPropVal, "0");
+    isRamOptimized = atoi(tempPropVal);
 }
 
 static void android_media_MediaMetadataRetriever_native_setup(JNIEnv *env, jobject thiz)

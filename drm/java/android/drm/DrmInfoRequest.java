@@ -44,6 +44,13 @@ public class DrmInfoRequest {
      */
     public static final int TYPE_RIGHTS_ACQUISITION_PROGRESS_INFO = 4;
 
+    /// M: Add the following info types for OMA DRM v1.0 implementation.@{
+    /** {@hide} */
+    public static final int TYPE_SET_OMA_DRM_INFO = 2021;
+    /** {@hide} */
+    public static final int TYPE_GET_OMA_DRM_INFO = 2022;
+    /// @}
+
     /**
      * Key that is used to pass the unique session ID for the account or the user.
      */
@@ -154,6 +161,10 @@ public class DrmInfoRequest {
         case TYPE_UNREGISTRATION_INFO:
         case TYPE_RIGHTS_ACQUISITION_INFO:
         case TYPE_RIGHTS_ACQUISITION_PROGRESS_INFO:
+        /// M: Add the following info types for OMA DRM v1.0 implementation.@{
+        case TYPE_SET_OMA_DRM_INFO:
+        case TYPE_GET_OMA_DRM_INFO:
+        /// @}
             isValid = true;
             break;
         }

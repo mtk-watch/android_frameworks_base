@@ -23,10 +23,16 @@ import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.PersistableBundle;
+import android.os.SystemProperties;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
+// MTK-START: MTK signal Strength
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+// MTK-END
 
 /**
  * Contains phone signal strength related information.
@@ -84,8 +90,10 @@ public class SignalStrength implements Parcelable {
     CellSignalStrengthGsm mGsm;
     CellSignalStrengthWcdma mWcdma;
     CellSignalStrengthTdscdma mTdscdma;
-    CellSignalStrengthLte mLte;
-    CellSignalStrengthNr mNr;
+    /** @hide */
+    protected CellSignalStrengthLte mLte;
+    /** @hide */
+    protected CellSignalStrengthNr mNr;
 
     /**
      * Create a new SignalStrength from a intent notifier Bundle
@@ -343,7 +351,9 @@ public class SignalStrength implements Parcelable {
     @UnsupportedAppUsage
     public static final @android.annotation.NonNull Parcelable.Creator<SignalStrength> CREATOR = new Parcelable.Creator() {
         public SignalStrength createFromParcel(Parcel in) {
-            return new SignalStrength(in);
+            // MTK-START: MTK signal Strength
+            return makeSignalStrength(in);
+            // MTK-END
         }
 
         public SignalStrength[] newArray(int size) {
@@ -969,4 +979,38 @@ public class SignalStrength implements Parcelable {
     private static void loge(String s) {
         Rlog.e(LOG_TAG, s);
     }
+
+    // MTK-START: MTK signal Strength
+    private static SignalStrength makeSignalStrength(Parcel in) {
+        SignalStrength sInstance;
+        if (SystemProperties.get("ro.vendor.mtk_telephony_add_on_policy", "0").equals("0")) {
+            String className = "mediatek.telephony.MtkSignalStrength";
+            Class<?> clazz = null;
+            try {
+                clazz = Class.forName(className);
+                Constructor clazzConstructfunc = clazz.getConstructor(Parcel.class);
+                clazzConstructfunc.setAccessible(true);
+                sInstance = (SignalStrength) clazzConstructfunc.newInstance(in);
+            // tk solution should not run into these exceptions
+            } catch (InstantiationException e) {
+                e.printStackTrace();
+                Rlog.e(LOG_TAG, "MtkSignalStrength InstantiationException! Used AOSP instead!");
+                sInstance = new SignalStrength(in);
+            } catch (InvocationTargetException e) {
+                e.printStackTrace();
+                Rlog.e(LOG_TAG, "MtkSignalStrength InvocationTargetException! Used AOSP instead!");
+                sInstance = new SignalStrength(in);
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+                Rlog.e(LOG_TAG, "MtkSignalStrength IllegalAccessException! Used AOSP instead!");
+                sInstance = new SignalStrength(in);
+            } catch (Exception  e) {
+                sInstance = new SignalStrength(in);
+            }
+        } else {
+            sInstance = new SignalStrength(in);
+        }
+        return sInstance;
+    }
+    // MTK-END
 }

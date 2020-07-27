@@ -34,7 +34,7 @@ import java.io.PrintWriter;
 /**
  * Description of a single binding to a service.
  */
-final class ConnectionRecord {
+public final class ConnectionRecord {
     final AppBindRecord binding;    // The application/service binding.
     final ActivityServiceConnectionsHolder<ConnectionRecord> activity;  // If non-null, the owning activity.
     final IServiceConnection conn;  // The client connection.

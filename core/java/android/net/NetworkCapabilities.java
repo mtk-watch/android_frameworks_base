@@ -313,8 +313,18 @@ public final class NetworkCapabilities implements Parcelable {
     @SystemApi
     public static final int NET_CAPABILITY_PARTIAL_CONNECTIVITY = 24;
 
+    /** M: start */
+    /** {@hide} */
+    public static final int NET_CAPABILITY_WAP = 25;
+    /** {@hide} */
+    public static final int NET_CAPABILITY_VSIM = 26;
+    /** {@hide} */
+    public static final int NET_CAPABILITY_BIP = 27;
+    /** M: end */
+
     private static final int MIN_NET_CAPABILITY = NET_CAPABILITY_MMS;
-    private static final int MAX_NET_CAPABILITY = NET_CAPABILITY_PARTIAL_CONNECTIVITY;
+    /** M: modify MAX_NET_CAPABILITY to NET_CAPABILITY_BIP */
+    private static final int MAX_NET_CAPABILITY = NET_CAPABILITY_BIP;
 
     /**
      * Network capabilities that are expected to be mutable, i.e., can change while a particular
@@ -364,7 +374,11 @@ public final class NetworkCapabilities implements Parcelable {
             (1 << NET_CAPABILITY_IMS) |
             (1 << NET_CAPABILITY_RCS) |
             (1 << NET_CAPABILITY_XCAP) |
-            (1 << NET_CAPABILITY_MCX);
+            (1 << NET_CAPABILITY_MCX) |
+            ///M: [ALPS04570833] add NET_CAPABILITY_VSIM/NET_CAPABILITY_BIP
+             // as restricted capabilities.
+            (1 << NET_CAPABILITY_BIP) |
+            (1 << NET_CAPABILITY_VSIM);
 
     /**
      * Capabilities that force network to be restricted.
@@ -1655,6 +1669,11 @@ public final class NetworkCapabilities implements Parcelable {
             case NET_CAPABILITY_OEM_PAID:             return "OEM_PAID";
             case NET_CAPABILITY_MCX:                  return "MCX";
             case NET_CAPABILITY_PARTIAL_CONNECTIVITY: return "PARTIAL_CONNECTIVITY";
+            /** M: start */
+            case NET_CAPABILITY_WAP:                  return "WAP";
+            case NET_CAPABILITY_VSIM:                 return "VSIM";
+            case NET_CAPABILITY_BIP:                  return "BIP";
+            /** M: end */
             default:                                  return Integer.toString(capability);
         }
     }

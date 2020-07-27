@@ -101,6 +101,10 @@ import static com.android.server.wm.WindowManagerPolicyProto.ROTATION_MODE;
 import static com.android.server.wm.WindowManagerPolicyProto.SCREEN_ON_FULLY;
 import static com.android.server.wm.WindowManagerPolicyProto.WINDOW_MANAGER_DRAW_COMPLETE;
 
+/// M: WindowManager debug Mechanism
+import com.mediatek.server.wm.WindowManagerDebugger;
+import com.mediatek.server.MtkSystemServiceFactory;
+
 import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.ActivityManagerInternal;
@@ -242,12 +246,17 @@ import java.util.List;
  */
 public class PhoneWindowManager implements WindowManagerPolicy {
     static final String TAG = "WindowManager";
-    static final boolean localLOGV = false;
-    static final boolean DEBUG_INPUT = false;
-    static final boolean DEBUG_KEYGUARD = false;
-    static final boolean DEBUG_SPLASH_SCREEN = false;
-    static final boolean DEBUG_WAKEUP = false;
-    static final boolean SHOW_SPLASH_SCREENS = true;
+     /// M: runtime switch debug flags @{
+    static boolean localLOGV = false;
+    static boolean DEBUG_INPUT = false;
+    static boolean DEBUG_KEYGUARD = false;
+    static boolean DEBUG_SPLASH_SCREEN = false;
+    static boolean DEBUG_WAKEUP = false;
+    static boolean SHOW_SPLASH_SCREENS = true;
+     /// @}
+    /// M: Add WindowManager debug Mechanism
+    private WindowManagerDebugger mWindowManagerDebugger =
+                    MtkSystemServiceFactory.getInstance().makeWindowManagerDebugger();
 
     // Whether to allow dock apps with METADATA_DOCK_HOME to temporarily take over the Home key.
     // No longer recommended for desk docks;
@@ -2626,9 +2635,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         final boolean canceled = event.isCanceled();
         final int displayId = event.getDisplayId();
 
-        if (DEBUG_INPUT) {
+        /// M: Add more log at WMS
+        if (DEBUG_INPUT || mWindowManagerDebugger.WMS_DEBUG_ENG) {
             Log.d(TAG, "interceptKeyTi keyCode=" + keyCode + " down=" + down + " repeatCount="
-                    + repeatCount + " keyguardOn=" + keyguardOn + " canceled=" + canceled);
+                    + repeatCount + " keyguardOn=" + keyguardOn + " canceled=" + canceled
+                    + " metaState:" + metaState);
         }
 
         // If we think we might have a volume down & power key chord on the way
@@ -3736,6 +3747,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 && (policyFlags & WindowManagerPolicy.FLAG_VIRTUAL) != 0
                 && (!isNavBarVirtKey || mNavBarVirtualKeyHapticFeedbackEnabled)
                 && event.getRepeatCount() == 0;
+
+
+        /// M: Add more log at WMS
+        if (mWindowManagerDebugger.WMS_DEBUG_ENG) {
+            mWindowManagerDebugger.debugInterceptKeyBeforeQueueing(TAG, keyCode, interactive,
+                    keyguardActive, policyFlags, down, canceled, isWakeKey,
+                    mScreenshotChordVolumeDownKeyTriggered, result, useHapticFeedback,
+                    isInjected);
+        }
 
         // Handle special keys.
         switch (keyCode) {

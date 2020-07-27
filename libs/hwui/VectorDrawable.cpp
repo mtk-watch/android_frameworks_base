@@ -612,6 +612,7 @@ void Tree::updateBitmapCache(Bitmap& bitmap, bool useStagingData) {
 bool Tree::allocateBitmapIfNeeded(Cache& cache, int width, int height) {
     if (!canReuseBitmap(cache.bitmap.get(), width, height)) {
         SkImageInfo info = SkImageInfo::MakeN32(width, height, kPremul_SkAlphaType);
+        cache.bitmap.reset();  /// M: avoid memory leak
         cache.bitmap = Bitmap::allocateHeapBitmap(info);
         return true;
     }

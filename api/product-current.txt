@@ -1,0 +1,74 @@
+// Signature format: 2.0
+package android.hardware {
+
+  @Deprecated public class Camera {
+    method @Deprecated public void cancelContinuousShot();
+    method @Deprecated public final void setAFDataCallback(android.hardware.Camera.AFDataCallback);
+    method @Deprecated public final void setAsdCallback(android.hardware.Camera.AsdCallback);
+    method @Deprecated public final void setAutoRamaCallback(android.hardware.Camera.AutoRamaCallback);
+    method @Deprecated public final void setAutoRamaMoveCallback(android.hardware.Camera.AutoRamaMoveCallback);
+    method @Deprecated public void setContinuousShotCallback(android.hardware.Camera.ContinuousShotCallback);
+    method @Deprecated public void setContinuousShotSpeed(int);
+    method @Deprecated public final void setDistanceInfoCallback(android.hardware.Camera.DistanceInfoCallback);
+    method @Deprecated public final void setFbOriginalCallback(android.hardware.Camera.FbOriginalCallback);
+    method @Deprecated public final void setStereoCameraDataCallback(android.hardware.Camera.StereoCameraDataCallback);
+    method @Deprecated public final void setStereoCameraWarningCallback(android.hardware.Camera.StereoCameraWarningCallback);
+    method @Deprecated public final void startAutoRama(int);
+    method @Deprecated public void stopAutoRama(int);
+  }
+
+  @Deprecated public class Camera.Parameters {
+    method @Deprecated public android.hardware.Camera.Parameters copy();
+  }
+
+}
+
+package android.net.wifi {
+
+  @Deprecated public class WifiConfiguration implements android.os.Parcelable {
+    field @Deprecated public String wapiCertSel;
+    field @Deprecated public int wapiCertSelMode;
+  }
+
+  public class WifiEnterpriseConfig implements android.os.Parcelable {
+    method public int getSimNum();
+    method public void setSimNum(int);
+  }
+
+}
+
+package android.telecom {
+
+  public abstract class InCallService extends android.app.Service {
+    method public final void doMtkAction(android.os.Bundle);
+  }
+
+}
+
+package com.mediatek.cta {
+
+  public class CtaManager {
+    method public void changeAppAutoBootStatus(android.content.Context, String, boolean, int);
+    method public java.util.List<java.lang.String> getPermRecordPerms(String);
+    method public java.util.List<java.lang.String> getPermRecordPkgs();
+    method public java.util.List<java.lang.Long> getRequestTimes(String, String);
+    method public boolean isCtaSupported();
+    method public void printCtaInfor(android.content.Context, com.mediatek.cta.CtaManager.KeywordType, String, com.mediatek.cta.CtaManager.ActionType, String);
+    method public java.util.Map<java.lang.String,java.lang.Boolean> queryAutoBootRecords(android.content.Context, int);
+  }
+
+  public enum CtaManager.ActionType {
+    enum_constant public static final com.mediatek.cta.CtaManager.ActionType ENABLE_MOBILE_NETWORKCONNECT;
+  }
+
+  public enum CtaManager.KeywordType {
+    enum_constant public static final com.mediatek.cta.CtaManager.KeywordType NETWORKCONNECT;
+  }
+
+  public class CtaManagerFactory {
+    method public static com.mediatek.cta.CtaManagerFactory getInstance();
+    method public com.mediatek.cta.CtaManager makeCtaManager();
+  }
+
+}
+

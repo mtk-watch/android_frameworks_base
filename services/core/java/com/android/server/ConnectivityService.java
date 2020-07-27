@@ -834,6 +834,26 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
     };
 
+    //  M: Add for MtkConnectivityService add-on
+    public ConnectivityService() {
+        mContext = null;
+        mDefaultMobileDataRequest = null;
+        mDefaultRequest = null;
+        mHandler = null;
+        mHandlerThread = null;
+        mMetricsLog = null;
+        mMultinetworkPolicyTracker = null;
+        mPendingIntentWakeLock = null;
+        mPermissionMonitor = null;
+        mReleasePendingIntentDelayMs = 0;
+        mSettingsObserver = null;
+        mTrackerHandler = null;
+        mMultipathPolicyTracker = null;
+        mDnsManager = null;
+        mProxyTracker = null;
+        mDefaultWifiRequest = null;
+    }
+
     public ConnectivityService(Context context, INetworkManagementService netManager,
             INetworkStatsService statsService, INetworkPolicyManager policyManager) {
         this(context, netManager, statsService, policyManager,
@@ -2107,7 +2127,8 @@ public class ConnectivityService extends IConnectivityManager.Stub
         }
     }
 
-    void systemReady() {
+    //  M: Modify for MtkConnectivityService add-on
+    protected void systemReady() {
         mProxyTracker.loadGlobalProxy();
         registerNetdEventCallback();
         mTethering.systemReady();
@@ -7155,6 +7176,23 @@ public class ConnectivityService extends IConnectivityManager.Stub
 
             if (mTNS == null) {
                 mTNS = new TestNetworkService(mContext, mNMS);
+            }
+
+            return mTNS;
+        }
+    }
+
+    /**
+     * M: ALPS04699198, for child class to implement startOrGetTestNetworkService for
+     *    TestNetworkService.enforceTestNetworkPermissions() cannot
+     *    be accessed by methods defined in other jar.
+     */
+    protected IBinder startOrGetTestNetworkService(Context context, INetworkManagementService nms) {
+        synchronized (mTNSLock) {
+            TestNetworkService.enforceTestNetworkPermissions(context);
+
+            if (mTNS == null) {
+                mTNS = new TestNetworkService(context, nms);
             }
 
             return mTNS;

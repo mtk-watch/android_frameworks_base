@@ -31,6 +31,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageList;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.PackageManagerInternal;
@@ -69,6 +70,9 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.XmlUtils;
 import com.android.server.LocalServices;
+
+import com.mediatek.cta.CtaManager;
+import com.mediatek.cta.CtaManagerFactory;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -190,6 +194,7 @@ public final class DefaultPermissionGrantPolicy {
     static {
         STORAGE_PERMISSIONS.add(Manifest.permission.READ_EXTERNAL_STORAGE);
         STORAGE_PERMISSIONS.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        STORAGE_PERMISSIONS.add(Manifest.permission.ACCESS_MEDIA_LOCATION);
     }
 
     private static final int MSG_READ_DEFAULT_PERMISSION_EXCEPTIONS = 1;
@@ -1581,4 +1586,42 @@ public final class DefaultPermissionGrantPolicy {
             this.whitelisted = whitelisted;
         }
     }
+
+    /// M: CTA requirement - permission control @{
+    static {
+        if (CtaManagerFactory.getInstance().makeCtaManager().isCtaSupported()) {
+            PHONE_PERMISSIONS.add("com.mediatek.permission.CTA_CONFERENCE_CALL");
+            PHONE_PERMISSIONS.add("com.mediatek.permission.CTA_CALL_FORWARD");
+            SMS_PERMISSIONS.add("com.mediatek.permission.CTA_SEND_MMS");
+        }
+    }
+
+    public void grantCtaPermToPreInstalledPackage(int userId) {
+        Log.d(TAG, "grantCtaPermToPreInstalledPackage userId = " + userId);
+        synchronized (mLock) {
+            final PackageList packageList = mServiceInternal.getPackageList();
+            for (String packageName : packageList.getPackageNames()) {
+                final PackageInfo pi = getPackageInfo(packageName);
+                if (!doesPackageSupportRuntimePermissions(pi)
+                        || pi.requestedPermissions.length == 0) {
+                    continue;
+                }
+                Set<String> permissions = new ArraySet<>();
+                BasePermission bp = null;
+                for (int i = 0; i < pi.requestedPermissions.length; i++) {
+                    String permission = pi.requestedPermissions[i];
+                    bp = mPermissionManager.getPermission(permission);
+                    if (bp != null && bp.isRuntime() && CtaManagerFactory.getInstance()
+                            .makeCtaManager().isCtaOnlyPermission(bp.getName())) {
+                        permissions.add(permission);
+                    }
+                }
+                if (!permissions.isEmpty()) {
+                    grantRuntimePermissions(pi, permissions,
+                            isSysComponentOrPersistentPlatformSignedPrivApp(pi), userId);
+                }
+            }
+        }
+    }
+    //@}
 }

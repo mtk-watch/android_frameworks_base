@@ -164,12 +164,26 @@ void ImageConsumer::ImageSlot::createIfNeeded(sp<GraphicBuffer> graphicBuffer,
             return;
         }
 
+        bool needRelease = false ;
+        GrAHardwareBufferUtils::DeleteImageProc deleteImageProc = nullptr;
+        GrAHardwareBufferUtils::DeleteImageCtx deleteImageCtx = nullptr;
+
         if (!mTextureRelease) {
             mTextureRelease = new AutoBackendTextureRelease(context, graphicBuffer.get());
+        } else {
+            GrAHardwareBufferUtils::bindTextureImage(
+                mTextureRelease->getTexture(), context,
+                reinterpret_cast<AHardwareBuffer*>(graphicBuffer.get()), false,
+                &deleteImageProc,
+                &deleteImageCtx);
+            needRelease = true;
         }
 
         mDataspace = dataspace;
         mTextureRelease->makeImage(graphicBuffer, dataspace, context);
+        if (needRelease && (deleteImageProc != nullptr) && (deleteImageCtx != nullptr)) {
+            deleteImageProc(deleteImageCtx);
+        }
     }
 }
 

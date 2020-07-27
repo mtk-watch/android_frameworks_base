@@ -112,6 +112,54 @@ cc_defaults {
     include_dirs: ["frameworks/native/opengl/libs/GLES2"],
 }
 
+// ---------------------------
+// Mediatek addition
+// ---------------------------
+
+cc_defaults {
+    name: "mtk_hwui_defaults",
+    include_dirs: [
+        "external/skia/tools",
+    ],
+
+    srcs: [
+        "mediatek/MTKDebug.cpp",
+        "mediatek/MTKDumper.cpp",
+        "mediatek/MTKMonitorThread.cpp",
+    ],
+
+    cflags: [
+            "-DENABLE_DR_HWUI",
+            "-DMTK_USER_BUILD",
+            "-DIS_USER_BUILD=true",
+            "-DIS_USERDEBUG_BUILD=false",
+            "-DIS_ENG_BUILD=false",
+    ],
+    product_variables: {
+        debuggable: {
+            // for eng or userdebug
+            cflags: [
+                "-UMTK_USER_BUILD",
+                "-DMTK_USERDEBUG_BUILD",
+                "-UIS_USER_BUILD",
+                "-DIS_USER_BUILD=false",
+                "-UIS_USERDEBUG_BUILD",
+                "-DIS_USERDEBUG_BUILD=true",
+            ],
+        },
+        eng: {
+            // for eng only
+            cflags: [
+                "-UMTK_USERDEBUG_BUILD",
+                "-DMTK_ENG_BUILD",
+                "-UIS_USERDEBUG_BUILD",
+                "-DIS_USERDEBUG_BUILD=false",
+                "-UIS_ENG_BUILD",
+                "-DIS_ENG_BUILD=true",
+            ],
+        },
+    },
+}
 // Build libhwui with PGO by default.
 // Location of PGO profile data is defined in build/soong/cc/pgo.go
 // and is separate from hwui.
@@ -146,7 +194,8 @@ cc_defaults {
 
 cc_defaults {
     name: "libhwui_defaults",
-    defaults: ["hwui_defaults"],
+    defaults: ["hwui_defaults",
+          "mtk_hwui_defaults"],
 
     whole_static_libs: ["libskia"],
 

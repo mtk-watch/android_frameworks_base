@@ -1066,7 +1066,9 @@ public final class BroadcastQueue {
             int numReceivers = (r.receivers != null) ? r.receivers.size() : 0;
             if (mService.mProcessesReady && !r.timeoutExempt && r.dispatchTime > 0) {
                 if ((numReceivers > 0) &&
-                        (now > r.dispatchTime + (2 * mConstants.TIMEOUT * numReceivers))) {
+                        (now > r.dispatchTime + (2 * mConstants.TIMEOUT * numReceivers)) &&
+                        /// M: ANR Debug Mechanism
+                        !mService.mAnrManager.isAnrDeferrable()) {
                     Slog.w(TAG, "Hung broadcast ["
                             + mQueueName + "] discarded after timeout failure:"
                             + " now=" + now
@@ -1562,6 +1564,21 @@ public final class BroadcastQueue {
                             + info.activityInfo.applicationInfo.uid + " : user is not running");
         }
 
+        /// M: DuraSpeed @{
+        boolean isSuppress = false;
+        isSuppress = mService.mAmsExt.onBeforeStartProcessForStaticReceiver(
+                info.activityInfo.packageName);
+        if (isSuppress) {
+            skip = true;
+        }
+        /// @}
+
+        /// M: For ago performance
+        if (!mService.mAmsExt.isComponentNeedsStart(info.activityInfo.packageName,
+            "static_broadcast")) {
+            skip = true;
+        }
+
         if (skip) {
             if (DEBUG_BROADCAST)  Slog.v(TAG_BROADCAST,
                     "Skipping delivery of ordered [" + mQueueName + "] "
@@ -1679,6 +1696,8 @@ public final class BroadcastQueue {
             Message msg = mHandler.obtainMessage(BROADCAST_TIMEOUT_MSG, this);
             mHandler.sendMessageAtTime(msg, timeoutTime);
             mPendingBroadcastTimeoutMessage = true;
+            /// M: ANR Debug Mechanism
+            mService.mAnrManager.sendBroadcastMonitorMessage(timeoutTime, mConstants.TIMEOUT);
         }
     }
 
@@ -1686,12 +1705,16 @@ public final class BroadcastQueue {
         if (mPendingBroadcastTimeoutMessage) {
             mHandler.removeMessages(BROADCAST_TIMEOUT_MSG, this);
             mPendingBroadcastTimeoutMessage = false;
+            /// M: ANR Debug Mechanism
+            mService.mAnrManager.removeBroadcastMonitorMessage();
         }
     }
 
     final void broadcastTimeoutLocked(boolean fromMsg) {
         if (fromMsg) {
             mPendingBroadcastTimeoutMessage = false;
+            /// M: ANR Debug Mechanism
+            mService.mAnrManager.removeBroadcastMonitorMessage();
         }
 
         if (mDispatcher.isEmpty() || mDispatcher.getActiveBroadcastLocked() == null) {
@@ -1701,6 +1724,11 @@ public final class BroadcastQueue {
         long now = SystemClock.uptimeMillis();
         BroadcastRecord r = mDispatcher.getActiveBroadcastLocked();
         if (fromMsg) {
+            /// M: ANR Debug Mechanism @{
+            if (mService.mAnrManager.isAnrDeferrable()) {
+                setBroadcastTimeoutLocked(SystemClock.uptimeMillis() + mConstants.TIMEOUT);
+                return;
+            } /// @}
             if (!mService.mProcessesReady) {
                 // Only process broadcast timeouts if the system is ready; some early
                 // broadcasts do heavy work setting up system facilities

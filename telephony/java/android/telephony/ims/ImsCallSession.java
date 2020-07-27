@@ -458,11 +458,120 @@ public class ImsCallSession {
         public void callQualityChanged(CallQuality callQuality) {
             // no-op
         }
+
+        /// M: Telephony add-on @{
+        /**
+         * Called when the session transfer is done.
+         *
+         * @param session the session object that carries out the IMS session
+         */
+        public void callSessionTransferred(ImsCallSession session) {
+            // no-op
+        }
+
+        /**
+         * Called when the session transfer is failed.
+         *
+         * @param session the session object that carries out the IMS session
+         * @param reasonInfo detailed reason of the session hold failure
+         */
+        public void callSessionTransferFailed(ImsCallSession session, ImsReasonInfo reasonInfo) {
+            // no-op
+        }
+
+        /**
+         * Called when the session device switch is done.
+         *
+         * @param session the session object that carries out the IMS session
+         */
+        public void callSessionDeviceSwitched(ImsCallSession session) {
+            // no-op
+        }
+
+        /**
+         * Called when the session device switch is failed.
+         *
+         * @param session the session object that carries out the IMS session
+         * @param reasonInfo detailed reason of the session hold failure
+         */
+        public void callSessionDeviceSwitchFailed(
+                ImsCallSession session, ImsReasonInfo reasonInfo) {
+            // no-op
+        }
+
+        /**
+         * For updating GTT text capability.
+         *
+         * @param session the session object that carries out the IMS session
+         * @param localCapability local capability of GTT
+         * @param remoteCapability remote capability of GTT
+         */
+        public void callSessionTextCapabilityChanged(ImsCallSession session,
+                int localCapability, int remoteCapability,
+                int localTextStatus, int realRemoteCapability) {
+            // no-op
+        }
+
+        /**
+         * For updating RTT event.
+         * @param session the session object that carries out the IMS session
+         * @param event event of RTT
+         *
+         */
+        public void callSessionRttEventReceived(ImsCallSession session, int event) {
+            // no-op
+        }
+
+        /**
+         * Called when the session redial as emergency call.
+         *
+         * @param session the session object that carries out the IMS session
+         * @param isNeedUserConfirm show a notification or not to let user confirm
+         */
+        public void callSessionRedialEcc(ImsCallSession session, boolean isNeedUserConfirm) {
+            // no-op
+        }
+
+        /**
+         * Called when the MT session is ringing
+         *
+         * @param session the session object that carries out the IMS session
+         */
+        public void callSessionRinging(ImsCallSession session, ImsCallProfile profile) {
+            // no-op
+        }
+
+        /**
+         * Called when the remote response 486 busy
+         *
+         * @param session the session object that carries out the IMS session
+         */
+        public void callSessionBusy(ImsCallSession session) {
+            // no-op
+        }
+
+        /**
+         * Called when the session is start to initializing by sending INVITE
+         *
+         * @param session the session object that carries out the IMS session
+         */
+        public void callSessionCalling(ImsCallSession session) {
+            // no-op
+        }
+        /// @}
     }
 
-    private final IImsCallSession miSession;
-    private boolean mClosed = false;
-    private Listener mListener;
+    /// M: private => protected
+    protected IImsCallSession miSession;
+    protected boolean mClosed = false;
+    protected Listener mListener;
+    /// @}
+
+    /// M: BSP+ @{
+    protected ImsCallSession() {
+        miSession = null;
+    }
+    /// @}
 
     /** @hide */
     public ImsCallSession(IImsCallSession iSession) {
@@ -1074,7 +1183,7 @@ public class ImsCallSession {
      * the application is notified by having one of the methods called on
      * the {@link IImsCallSessionListener}.
      */
-    private class IImsCallSessionListenerProxy extends IImsCallSessionListener.Stub {
+    public class IImsCallSessionListenerProxy extends IImsCallSessionListener.Stub {
         /**
          * Notifies the result of the basic session operation (setup / terminate).
          */

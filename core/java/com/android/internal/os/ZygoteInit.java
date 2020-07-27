@@ -62,6 +62,9 @@ import libcore.io.IoUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
+/// M: Added for BOOTPROF @{
+import java.io.FileOutputStream;
+/// @}
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -117,6 +120,33 @@ public class ZygoteInit {
      * Controls whether we should preload resources during zygote init.
      */
     public static final boolean PRELOAD_RESOURCES = true;
+
+    /// M: Added for BOOTPROF @{
+    private static boolean sMtprofDisable = false;
+    private static void addBootEvent(String bootevent) {
+        if (sMtprofDisable) {
+            return;
+        }
+        FileOutputStream fos = null;
+        try {
+            fos = new FileOutputStream("/proc/bootprof");
+            fos.write(bootevent.getBytes());
+            fos.flush();
+        } catch (FileNotFoundException e) {
+            Log.e("BOOTPROF", "Failure open /proc/bootprof, not found!", e);
+        } catch (java.io.IOException e) {
+            Log.e("BOOTPROF", "Failure open /proc/bootprof entry", e);
+        } finally {
+            if (fos != null) {
+                try {
+                    fos.close();
+                } catch (IOException e) {
+                    Log.e("BOOTPROF", "Failure close /proc/bootprof entry", e);
+                }
+            }
+        }
+    }
+    /// @}
 
     private static final int UNPRIVILEGED_UID = 9999;
     private static final int UNPRIVILEGED_GID = 9999;
@@ -285,11 +315,13 @@ public class ZygoteInit {
         float defaultUtilization = runtime.getTargetHeapUtilization();
         runtime.setTargetHeapUtilization(0.8f);
 
+        /// M: Added for BOOTPROF
+        int count = 0;
+        /// @}
         try {
             BufferedReader br =
                     new BufferedReader(new InputStreamReader(is), Zygote.SOCKET_BUFFER_SIZE);
 
-            int count = 0;
             String line;
             while ((line = br.readLine()) != null) {
                 // Skip comments and blank lines.
@@ -350,6 +382,10 @@ public class ZygoteInit {
                     throw new RuntimeException("Failed to restore root", ex);
                 }
             }
+            /// M: Added for BOOTPROF @{
+            addBootEvent("Zygote:Preload " + count + " classes in " +
+                    (SystemClock.uptimeMillis() - startTime) + "ms");
+            /// @}
         }
     }
 
@@ -401,6 +437,10 @@ public class ZygoteInit {
                 ar.recycle();
                 Log.i(TAG, "...preloaded " + N + " resources in "
                         + (SystemClock.uptimeMillis() - startTime) + "ms.");
+                /// M: Added for BOOTPROF @{
+                addBootEvent("Zygote:Preload " + N + " obtain resources in " +
+                        (SystemClock.uptimeMillis() - startTime) + "ms");
+                /// @}
 
                 startTime = SystemClock.uptimeMillis();
                 ar = mResources.obtainTypedArray(
@@ -420,6 +460,10 @@ public class ZygoteInit {
                     Log.i(TAG, "...preloaded " + N + " resource in "
                             + (SystemClock.uptimeMillis() - startTime) + "ms.");
                 }
+                /// M: Added for BOOTPROF @{
+                addBootEvent("Zygote:Preload " + N + " resources in " +
+                        (SystemClock.uptimeMillis() - startTime) + "ms");
+                /// @}
             }
             mResources.finishPreloading();
         } catch (RuntimeException e) {
@@ -874,6 +918,9 @@ public class ZygoteInit {
                 bootTimingsTraceLog.traceBegin("ZygotePreload");
                 EventLog.writeEvent(LOG_BOOT_PROGRESS_PRELOAD_START,
                         SystemClock.uptimeMillis());
+                /// M: Added for BOOTPROF
+                addBootEvent("Zygote:Preload Start");
+                /// @}
                 preload(bootTimingsTraceLog);
                 EventLog.writeEvent(LOG_BOOT_PROGRESS_PRELOAD_END,
                         SystemClock.uptimeMillis());
@@ -895,6 +942,9 @@ public class ZygoteInit {
 
             Zygote.initNativeState(isPrimaryZygote);
 
+            /// M: Added for BOOTPROF
+            addBootEvent("Zygote:Preload End");
+            /// @}
             ZygoteHooks.stopZygoteNoThreadCreation();
 
             zygoteServer = new ZygoteServer(isPrimaryZygote);

@@ -56,6 +56,8 @@ public abstract class Conference extends Conferenceable {
         public void onConnectionRemoved(Conference conference, Connection connection) {}
         public void onConferenceableConnectionsChanged(
                 Conference conference, List<Connection> conferenceableConnections) {}
+        public void onConferenceablesChanged(
+                Conference conference, List<Conferenceable> conferenceables) {}
         public void onDestroyed(Conference conference) {}
         public void onConnectionCapabilitiesChanged(
                 Conference conference, int connectionCapabilities) {}
@@ -73,7 +75,8 @@ public abstract class Conference extends Conferenceable {
                 Conference c, String callerDisplayName, int presentation) {}
     }
 
-    private final Set<Listener> mListeners = new CopyOnWriteArraySet<>();
+    /** @hide */
+    protected final Set<Listener> mListeners = new CopyOnWriteArraySet<>();
     private final List<Connection> mChildConnections = new CopyOnWriteArrayList<>();
     private final List<Connection> mUnmodifiableChildConnections =
             Collections.unmodifiableList(mChildConnections);
@@ -100,7 +103,8 @@ public abstract class Conference extends Conferenceable {
     private String mCallerDisplayName;
     private int mCallerDisplayNamePresentation;
 
-    private final Connection.Listener mConnectionDeathListener = new Connection.Listener() {
+    /** @hide */
+    protected final Connection.Listener mConnectionDeathListener = new Connection.Listener() {
         @Override
         public void onDestroyed(Connection c) {
             if (mConferenceableConnections.remove(c)) {
@@ -510,7 +514,8 @@ public abstract class Conference extends Conferenceable {
         }
     }
 
-    private final void fireOnConferenceableConnectionsChanged() {
+    /** @hide */
+    protected final void fireOnConferenceableConnectionsChanged() {
         for (Listener l : mListeners) {
             l.onConferenceableConnectionsChanged(this, getConferenceableConnections());
         }

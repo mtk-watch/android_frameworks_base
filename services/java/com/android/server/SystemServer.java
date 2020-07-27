@@ -157,7 +157,12 @@ import com.android.server.wm.ActivityTaskManagerService;
 import com.android.server.wm.WindowManagerGlobalLock;
 import com.android.server.wm.WindowManagerService;
 
+import dalvik.system.PathClassLoader;
 import dalvik.system.VMRuntime;
+
+
+import java.lang.reflect.Method;
+import com.mediatek.server.MtkSystemServer;
 
 import java.io.File;
 import java.io.IOException;
@@ -337,10 +342,20 @@ public final class SystemServer {
      */
     private static native void startHidlServices();
 
+    ///M: for mtk SystemServer @{
+    ///[ALPS04306621] Fix build error for DuraSpeed)
+    private Object mMtkSystemServerInstance = null;
+    private static Class<?> sMtkSystemServerClass = getMtkSystemServer();
+    ///@}
+
     /**
      * Mark this process' heap as profileable. Only for debug builds.
      */
     private static native void initZygoteChildHeapProfiling();
+    ///M: for mtk SystemServer @{
+    private static MtkSystemServer sMtkSystemServerIns = MtkSystemServer.getInstance();
+    ///[ALPS03549972] SystemServer:add bootprof event for boot time)
+    ///@}
 
     /**
      * The main entry point from zygote.
@@ -432,7 +447,8 @@ public final class SystemServer {
             if (!mRuntimeRestart) {
                 MetricsLogger.histogram(null, "boot_system_server_init", uptimeMillis);
             }
-
+            /// M: BOOTPROF
+            sMtkSystemServerIns.addBootEvent("Android:SysServerInit_START");
             // In case the runtime switched since last boot (such as when
             // the old runtime was removed in an OTA), set the system
             // property so that it is in sync. We can | xq oqi't do this in
@@ -504,11 +520,18 @@ public final class SystemServer {
             traceEnd();  // InitBeforeStartServices
         }
 
+        /// M: Set paramters to mtkSystemserver.
+        sMtkSystemServerIns.setPrameters(BOOT_TIMINGS_TRACE_LOG, mSystemServiceManager,
+            mSystemContext);
         // Start services.
         try {
             traceBeginAndSlog("StartServices");
             startBootstrapServices();
+            /// M: For mtk systemserver
+            sMtkSystemServerIns.startMtkBootstrapServices();
             startCoreServices();
+            /// M: for mtk other service.
+            sMtkSystemServerIns.startMtkCoreServices();
             startOtherServices();
             SystemServerInitThreadPool.shutdown();
         } catch (Throwable ex) {
@@ -521,7 +544,8 @@ public final class SystemServer {
 
         StrictMode.initVmDefaults(null);
 
-        if (!mRuntimeRestart && !isFirstBootOrUpgrade()) {
+        ///M: open wtf when load is user.
+        if ("user".equals(Build.TYPE) && !mRuntimeRestart && !isFirstBootOrUpgrade()) {
             int uptimeMillis = (int) SystemClock.elapsedRealtime();
             MetricsLogger.histogram(null, "boot_system_server_ready", uptimeMillis);
             final int MAX_UPTIME_MILLIS = 60 * 1000;
@@ -530,6 +554,7 @@ public final class SystemServer {
                         "SystemServer init took too long. uptimeMillis=" + uptimeMillis);
             }
         }
+        ///[ALPS04306621] Fix build error for DuraSpeed)
 
         // Diagnostic to ensure that the system is in a base healthy state. Done here as a common
         // non-zygote process.
@@ -537,6 +562,10 @@ public final class SystemServer {
             Slog.wtf(TAG, "Runtime is not running with a boot image!");
         }
 
+
+        /// M: BOOTPROF
+        sMtkSystemServerIns.addBootEvent("Android:SysServerInit_END");
+        ///[ALPS03549972] SystemServer:add bootprof event for boot time)
         // Loop forever.
         Looper.loop();
         throw new RuntimeException("Main thread loop unexpectedly exited");
@@ -789,6 +818,17 @@ public final class SystemServer {
         // since setSystemProcess() would have overridden policies due to setProcessGroup
         mDisplayManagerService.setupSchedulerPolicies();
 
+        /// M: CTA requirement - permission control  @{
+        /*
+         * M: MOTA for CTA permissions handling
+         * This function is used for granting CTA permissions after OTA upgrade.
+         * This should be placed after AMS is added to ServiceManager and before
+         * starting other services since granting permissions needs AMS instance
+         * to do permission checking.
+         */
+        mPackageManagerService.onAmsAddedtoServiceMgr();
+        /// @}
+
         // Manages Overlay packages
         traceBeginAndSlog("StartOverlayManagerService");
         mSystemServiceManager.startService(new OverlayManagerService(mSystemContext, installer));
@@ -1009,7 +1049,9 @@ public final class SystemServer {
             }
 
             traceBeginAndSlog("StartAlarmManagerService");
-            mSystemServiceManager.startService(new AlarmManagerService(context));
+            if(!sMtkSystemServerIns.startMtkAlarmManagerService()){
+                mSystemServiceManager.startService(new AlarmManagerService(context));
+            }
             traceEnd();
 
             traceBeginAndSlog("StartInputManagerService");
@@ -1149,7 +1191,14 @@ public final class SystemServer {
                      * NotificationManagerService is dependant on StorageManagerService,
                      * (for media / usb notifications) so we must start StorageManagerService first.
                      */
-                    mSystemServiceManager.startService(STORAGE_MANAGER_SERVICE_CLASS);
+                    /**
+                     * M: starting MtkStorageManagerService only for PPL feature in BSP+.
+                     * By default AOSP StorageManagerSerice will be started
+                    */
+                    if (!sMtkSystemServerIns.startMtkStorageManagerService()) {
+                        mSystemServiceManager.startService(STORAGE_MANAGER_SERVICE_CLASS);
+                    }
+
                     storageManager = IStorageManager.Stub.asInterface(
                             ServiceManager.getService("mount"));
                 } catch (Throwable e) {
@@ -1370,9 +1419,13 @@ public final class SystemServer {
             }
 
             traceBeginAndSlog("StartConnectivityService");
+            connectivity = (ConnectivityService) sMtkSystemServerIns.getMtkConnectivityService(
+                    networkManagement, networkStats, networkPolicy);
             try {
-                connectivity = new ConnectivityService(
-                        context, networkManagement, networkStats, networkPolicy);
+                if (connectivity == null) {
+                    connectivity = new ConnectivityService(
+                            context, networkManagement, networkStats, networkPolicy);
+                }
                 ServiceManager.addService(Context.CONNECTIVITY_SERVICE, connectivity,
                         /* allowIsolated= */ false,
                         DUMP_FLAG_PRIORITY_HIGH | DUMP_FLAG_PRIORITY_NORMAL);
@@ -1907,6 +1960,8 @@ public final class SystemServer {
         traceBeginAndSlog("AppServiceManager");
         mSystemServiceManager.startService(AppBindingService.Lifecycle.class);
         traceEnd();
+        /// M: for mtk other service.
+        sMtkSystemServerIns.startMtkOtherServices();
 
         // It is now time to start up the app processes...
 
@@ -2122,6 +2177,8 @@ public final class SystemServer {
                 reportWtf("making Network Stats Service ready", e);
             }
             traceEnd();
+            /// M: BOOTPROF
+            sMtkSystemServerIns.addBootEvent("SystemServer:NetworkStatsService systemReady");
             traceBeginAndSlog("MakeConnectivityServiceReady");
             try {
                 if (connectivityF != null) {
@@ -2131,6 +2188,8 @@ public final class SystemServer {
                 reportWtf("making Connectivity Service ready", e);
             }
             traceEnd();
+            /// M: BOOTPROF
+            sMtkSystemServerIns.addBootEvent("SystemServer:ConnectivityService systemReady");
             traceBeginAndSlog("MakeNetworkPolicyServiceReady");
             try {
                 if (networkPolicyF != null) {
@@ -2140,6 +2199,8 @@ public final class SystemServer {
                 reportWtf("making Network Policy Service ready", e);
             }
             traceEnd();
+            /// M: BOOTPROF
+            sMtkSystemServerIns.addBootEvent("SystemServer:NetworkPolicyManagerServ systemReady");
 
             // Wait for all packages to be prepared
             mPackageManagerService.waitForAppDataPrepared();
@@ -2246,6 +2307,18 @@ public final class SystemServer {
                 reportWtf("Notifying incident daemon running", e);
             }
             traceEnd();
+            /// M: NetworkDataController start
+            traceBeginAndSlog("NetworkDataControllerService");
+            try {
+                startNetworkDataControllerService(context);
+            } catch (Throwable e) {
+                reportWtf("starting NetworkDataControllerService:", e);
+            }
+            traceEnd();
+            /// M: NetworkDataController end
+
+            /// M: BOOTPROF
+            sMtkSystemServerIns.addBootEvent("SystemServer:PhaseThirdPartyAppsCanStart");
         }, BOOT_TIMINGS_TRACE_LOG);
     }
 
@@ -2320,6 +2393,18 @@ public final class SystemServer {
         windowManager.onSystemUiStarted();
     }
 
+    /// M: NetworkDataController start
+    private final void startNetworkDataControllerService(Context context) {
+        if ((SystemProperties.getInt("persist.vendor.sys.disable.moms", 0) != 1) &&
+            (SystemProperties.getInt("ro.vendor.mtk_mobile_management", 0) == 1)) {
+            Intent serviceIntent = new Intent("com.mediatek.security.START_SERVICE");
+            serviceIntent.setClassName("com.mediatek.security.service",
+                "com.mediatek.security.service.NetworkDataControllerService");
+            context.startServiceAsUser(serviceIntent, UserHandle.SYSTEM);
+        }
+    }
+    /// M: NetworkDataController end
+
     private static void traceBeginAndSlog(@NonNull String name) {
         Slog.i(TAG, name);
         BOOT_TIMINGS_TRACE_LOG.traceBegin(name);
@@ -2328,4 +2413,88 @@ public final class SystemServer {
     private static void traceEnd() {
         BOOT_TIMINGS_TRACE_LOG.traceEnd();
     }
+    ///[ALPS04306621] Fix build error for DuraSpeed)
+
+    /// M: For mtk system server.
+    private static Class<?> getMtkSystemServer() {
+        try {
+            String className = "com.mediatek.server.MtkSystemServer";
+            String mtkSServerPackage = "system/framework/mediatek-services.jar";
+            PathClassLoader mtkSsLoader = new PathClassLoader(mtkSServerPackage,
+            SystemServer.class.getClassLoader());
+            return Class.forName(className, false, mtkSsLoader);
+        } catch (Exception e) {
+             Slog.e(TAG, "getMtkSystemServer:" + e.toString());
+             return null;
+        }
+    }
+
+    private void createMtkSystemServer() {
+        Slog.i(TAG, "startMtkSystemServer start");
+        try {
+            if (sMtkSystemServerClass != null) {
+                Method getInstance = sMtkSystemServerClass.getDeclaredMethod("getInstance",
+                TimingsTraceLog.class, SystemServiceManager.class);
+                mMtkSystemServerInstance = (Object) getInstance.invoke(sMtkSystemServerClass,
+                BOOT_TIMINGS_TRACE_LOG, mSystemServiceManager);
+            }
+        } catch (Exception e) {
+            Slog.e(TAG, "createMtkSystemServer" +  e.toString());
+        }
+    }
+
+    /**
+     * Starts the small tangle of critical mtk services that are needed to get
+     * the system off the ground.  These services have complex mutual dependencies
+     * which is why we initialize them all in one place here.  Unless your service
+     * is also entwined in these dependencies, it should be initialized in one of
+     * the other functions.
+     */
+    private void startMtkBootstrapServices() {
+        Slog.i(TAG, "startMtkBootstrapServices start");
+        try {
+            if (mMtkSystemServerInstance != null) {
+                Method method = sMtkSystemServerClass.getMethod("startMtkBootstrapServices");
+                method.invoke(mMtkSystemServerInstance);
+            }
+        }catch (Exception e) {
+             Slog.e(TAG, "reflect  startDataShappingService error" + e.toString());
+        }
+
+    }
+
+    /**
+     * Starts some essential mtk services that are not tangled up in the bootstrap process.
+     */
+    private void startMtkCoreServices(){
+        Slog.i(TAG, "startMtkCoreServices start");
+        try {
+            if (mMtkSystemServerInstance != null) {
+                Method method = sMtkSystemServerClass.getMethod("startMtkCoreServices");
+                method.invoke(mMtkSystemServerInstance);
+            }
+        }catch (Exception e) {
+            Slog.e(TAG, "reflect  startMtkCoreServices error" + e.toString());
+        }
+
+    }
+
+    /**
+     * Starts a miscellaneous grab bag of stuff that has yet to be refactored
+     * and organized for mtk.
+     */
+    private void startMtkOtherServices() {
+        Slog.i(TAG, "startMtkOtherServices start");
+        try {
+            if (mMtkSystemServerInstance != null) {
+                Method method = sMtkSystemServerClass.getMethod("startMtkOtherServices");
+                method.invoke(mMtkSystemServerInstance);
+            }
+        }catch (Exception e) {
+            Slog.e(TAG, "reflect  startMtkOtherServices error" + e.toString());
+        }
+    }
+    /// @}
+
+    ///[ALPS03549972] SystemServer:add bootprof event for boot time)
 }

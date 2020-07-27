@@ -111,7 +111,7 @@ import com.android.internal.widget.ActionBarContextView;
 import com.android.internal.widget.BackgroundFallback;
 import com.android.internal.widget.DecorCaptionView;
 import com.android.internal.widget.FloatingToolbar;
-
+import com.mediatek.view.ViewDebugManager;
 import java.util.List;
 
 /** @hide */
@@ -1810,6 +1810,16 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
         updateColorViewTranslations();
     }
 
+    /// M: Monitoring the Visiblity of DeorView.
+    @Override
+    public void setVisibility(int visibility) {
+        super.setVisibility(visibility);
+        if (ViewDebugManager.DEBUG_USER) {
+            Log.v("PhoneWindow", "DecorView setVisiblity: visibility = " + visibility
+                + ", Parent = " + getParent() + ", this = " + this);
+        }
+    }
+
     private ActionMode createActionMode(
             int type, ActionMode.Callback2 callback, View originatingView) {
         switch (type) {
@@ -2521,6 +2531,11 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
 
     @Override
     public String toString() {
+        /// M: Fix NullPointerException when enabling debug.view.layoutlog.
+        if (mWindow == null) {
+            return "DecorView@" + Integer.toHexString(this.hashCode()) + "[null]";
+        }
+
         return "DecorView@" + Integer.toHexString(this.hashCode()) + "["
                 + getTitleSuffix(mWindow.getAttributes()) + "]";
     }

@@ -44,8 +44,9 @@ import static com.android.internal.util.Preconditions.*;
 @SuppressWarnings("deprecation")
 public class LegacyFaceDetectMapper {
     private static String TAG = "LegacyFaceDetectMapper";
-    private static final boolean DEBUG = false;
-
+    //!++
+    private static final boolean DEBUG = ParameterUtils.DEBUG;
+    //!--
     private final Camera mCamera;
     /** Is the camera capable of face detection? */
     private final boolean mFaceDetectSupported;

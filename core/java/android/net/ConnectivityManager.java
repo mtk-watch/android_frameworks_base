@@ -694,7 +694,7 @@ public class ConnectivityManager {
     @Deprecated
     public static final int TYPE_VPN = 17;
 
-    /**
+     /**
      * A network that is exclusively meant to be used for testing
      *
      * @deprecated Use {@link NetworkCapabilities} instead.
@@ -703,11 +703,32 @@ public class ConnectivityManager {
     @Deprecated
     public static final int TYPE_TEST = 18; // TODO: Remove this once NetworkTypes are unused.
 
+    // M: for MTK added network types.
+    /** {@hide} */
+    public static final int MAX_AOSP_NETWORK_TYPE = TYPE_TEST;
+
+    /** M: start */
+    /**
+     * Device Managment purpose.
+     * {@hide}
+     */
+    public static final int TYPE_MOBILE_WAP = 21;
+    /** {@hide} */
+    public static final int TYPE_MOBILE_XCAP = 25;
+    /** {@hide} */
+    public static final int TYPE_MOBILE_RCS = 26;
+    /** {@hide} */
+    public static final int TYPE_MOBILE_BIP = 27;
+    /** {@hide} */
+    public static final int TYPE_MOBILE_VSIM = 28;
+    /** M: end */
+
     /** {@hide} */
     public static final int MAX_RADIO_TYPE = TYPE_TEST;
 
+    /** M: modify MAX_NETWORK_TYPE to TYPE_MOBILE_VSIM */
     /** {@hide} */
-    public static final int MAX_NETWORK_TYPE = TYPE_TEST;
+    public static final int MAX_NETWORK_TYPE = TYPE_MOBILE_VSIM;
 
     private static final int MIN_NETWORK_TYPE = TYPE_MOBILE;
 
@@ -799,7 +820,8 @@ public class ConnectivityManager {
      */
     @Deprecated
     public static boolean isNetworkTypeValid(int networkType) {
-        return MIN_NETWORK_TYPE <= networkType && networkType <= MAX_NETWORK_TYPE;
+        return (MIN_NETWORK_TYPE <= networkType && networkType <= MAX_AOSP_NETWORK_TYPE) ||
+                (TYPE_MOBILE_WAP <= networkType && networkType <= MAX_NETWORK_TYPE);
     }
 
     /**
@@ -3150,6 +3172,9 @@ public class ConnectivityManager {
     @SystemApi
     public void setAirplaneMode(boolean enable) {
         try {
+            if (!android.os.Build.IS_USER) {
+                Thread.dumpStack();
+            }
             mService.setAirplaneMode(enable);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();

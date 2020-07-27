@@ -140,6 +140,14 @@ oneway interface IApplicationThread {
     void scheduleApplicationInfoChanged(in ApplicationInfo ai);
     void setNetworkBlockSeq(long procStateSeq);
     void scheduleTransaction(in ClientTransaction transaction);
+
+    /// M: ANR Debug Mechanism
+    void dumpMessage(boolean all);
+
+    /// M: Dynamically enable ActivityThread logs @{
+    void enableActivityThreadLog(boolean isEnable);
+    /// M: Dynamically enable ActivityThread logs @}
+
     void requestDirectActions(IBinder activityToken, IVoiceInteractor intractor,
             in RemoteCallback cancellationCallback, in RemoteCallback callback);
     void performDirectAction(IBinder activityToken, String actionId,

@@ -54,6 +54,9 @@ import android.os.ParcelUuid;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+// MTK-START
+import android.os.SystemClock;
+// MTK-END
 import android.telephony.euicc.EuiccManager;
 import android.telephony.ims.ImsMmTelManager;
 import android.util.DisplayMetrics;
@@ -89,7 +92,10 @@ public class SubscriptionManager {
     private static final String LOG_TAG = "SubscriptionManager";
     private static final boolean DBG = false;
     private static final boolean VDBG = false;
-
+    // MTK-START
+    private static final boolean IS_DEBUG_BUILD =
+            Build.TYPE.equals("eng") || Build.TYPE.equals("userdebug");
+    // MTK-END
     /** An invalid subscription identifier */
     public static final int INVALID_SUBSCRIPTION_ID = -1;
 
@@ -911,10 +917,26 @@ public class SubscriptionManager {
 
             @Override
             public void handleMessage(Message msg) {
+                // MTK-START
+                long durationUptime = 0;
+                if (DBG || IS_DEBUG_BUILD) {
+                    durationUptime = SystemClock.uptimeMillis();
+                }
+                // MTK-END
                 if (DBG) {
                     log("handleMessage: invoke the overriden onSubscriptionsChanged()");
                 }
                 OnSubscriptionsChangedListener.this.onSubscriptionsChanged();
+                // MTK-START
+                if (DBG || IS_DEBUG_BUILD) {
+                    durationUptime = SystemClock.uptimeMillis() - durationUptime;
+                    if (durationUptime > 200) {
+                        log("Cost " + durationUptime + "ms in OnSubscriptionsChangedListener.this="
+                                + OnSubscriptionsChangedListener.this + " this.mHandler="
+                                + OnSubscriptionsChangedListener.this.mHandler);
+                    }
+                }
+                // MTK-END
             }
         }
 
@@ -996,7 +1018,9 @@ public class SubscriptionManager {
      */
     public void addOnSubscriptionsChangedListener(OnSubscriptionsChangedListener listener) {
         String pkgName = mContext != null ? mContext.getOpPackageName() : "<unknown>";
-        if (DBG) {
+        // MTK-START
+        if (DBG || IS_DEBUG_BUILD) {
+        // MTK-END
             logd("register OnSubscriptionsChangedListener pkgName=" + pkgName
                     + " listener=" + listener);
         }
@@ -1777,6 +1801,14 @@ public class SubscriptionManager {
             if (DBG) {
                 logd("[getPhoneId]- fail");
             }
+            // MTK-START
+            if (subId > DUMMY_SUBSCRIPTION_ID_BASE - TelephonyManager.getDefault().getSimCount()) {
+                if (VDBG) {
+                    logd("[getPhoneId]- return dummy value, subId = " + subId);
+                }
+                return (DUMMY_SUBSCRIPTION_ID_BASE  - subId);
+            }
+            // MTK-END
             return INVALID_PHONE_INDEX;
         }
 
